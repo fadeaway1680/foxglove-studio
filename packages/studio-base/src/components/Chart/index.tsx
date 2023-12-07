@@ -72,7 +72,7 @@ const createWorker = multiplex(
   (): [ChartService, Worker] => {
     const worker = new Worker(
       // foxglove-depcheck-used: babel-plugin-transform-import-meta
-      new URL("./worker/ChartJSMux", import.meta.url),
+      new URL("./worker/ChartJsMux", import.meta.url),
     );
     return [Comlink.wrap(worker), worker];
   },
@@ -294,7 +294,7 @@ function Chart(props: Props): JSX.Element {
           ? canvas.transferControlToOffscreen()
           : canvas;
 
-      const scales = await serviceRef.current.initialize(id, {
+      const scales = await serviceRef.current.initialize(id, Comlink.transfer({
         node: offscreenCanvas,
         type,
         data: update.data,
@@ -303,7 +303,7 @@ function Chart(props: Props): JSX.Element {
         devicePixelRatio,
         width: update.width,
         height: update.height,
-      });
+      }, [offscreenCanvas]));
       maybeUpdateScales(scales);
       onFinishRender?.();
 

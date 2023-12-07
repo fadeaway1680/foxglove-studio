@@ -39,7 +39,6 @@ import { TypedChartData } from "../types";
 const log = Logger.getLogger(__filename);
 
 export type InitOpts = {
-  id: string;
   node: { canvas: HTMLCanvasElement };
   type: ChartType;
   data: ChartData<"scatter">;
