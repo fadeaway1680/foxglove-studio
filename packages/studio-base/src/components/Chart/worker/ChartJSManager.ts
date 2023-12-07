@@ -335,7 +335,7 @@ export default class ChartJSManager {
     this.#chartInstance?.destroy();
   }
 
-  public getElementsAtEvent({ event }: { event: MouseEvent }): RpcElement[] {
+  public getElementsAtEvent(event: MouseEvent): RpcElement[] {
     const ev = {
       native: true,
       x: event.clientX,
@@ -389,7 +389,7 @@ export default class ChartJSManager {
     return out;
   }
 
-  public getDatalabelAtEvent({ event }: { event: Event }): unknown {
+  public getDatalabelAtEvent(event: Event): unknown {
     this.#chartInstance?.notifyPlugins("beforeEvent", { event });
 
     // clear the stored click context - we have consumed it

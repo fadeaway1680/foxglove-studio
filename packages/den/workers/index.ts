@@ -8,6 +8,8 @@ type Instance<T> = [value: T, numClients: number];
 
 type Scheme = (counts: number[]) => number | undefined;
 
+export const scheme1to1: Scheme = () => undefined
+
 export const multiplex = <T>(create: () => T, destroy: (arg0: T) => void, scheme: Scheme) => {
   let instances: Instance<T>[] = [];
 

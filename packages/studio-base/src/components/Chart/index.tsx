@@ -8,6 +8,7 @@
 /// <reference types="chartjs-plugin-datalabels" />
 /// <reference types="@foxglove/chartjs-plugin-zoom" />
 
+import * as Comlink from "comlink";
 import { ChartOptions } from "chart.js";
 import Hammer from "hammerjs";
 import * as R from "ramda";
@@ -18,23 +19,18 @@ import { v4 as uuidv4 } from "uuid";
 
 import { type ZoomPluginOptions } from "@foxglove/chartjs-plugin-zoom/types/options";
 import Logger from "@foxglove/log";
-import ChartJsMux, {
-  ChartUpdateMessage,
+import {
+  ChartUpdate,
+  mainThread as ChartJsMux,
 } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
-import Rpc, { createLinkedChannels } from "@foxglove/studio-base/util/Rpc";
-import WebWorkerManager from "@foxglove/studio-base/util/WebWorkerManager";
 import { mightActuallyBePartial } from "@foxglove/studio-base/util/mightActuallyBePartial";
+import { multiplex, scheme1to1 } from "@foxglove/den/workers";
 
 import { TypedChartData, ChartData, RpcElement, RpcScales } from "./types";
 
-type PartialUpdate = Partial<ChartUpdateMessage>;
+type PartialUpdate = Partial<ChartUpdate>;
 
 const log = Logger.getLogger(__filename);
-
-function makeChartJSWorker() {
-  // foxglove-depcheck-used: babel-plugin-transform-import-meta
-  return new Worker(new URL("./worker/main", import.meta.url));
-}
 
 export type OnClickArg = {
   datalabel?: unknown;
@@ -70,7 +66,21 @@ type Props = {
 
 const devicePixelRatio = mightActuallyBePartial(window).devicePixelRatio ?? 1;
 
-const webWorkerManager = new WebWorkerManager(makeChartJSWorker, 4);
+type ChartService = Comlink.Remote<(typeof import("./worker/ChartJsMux"))["service"]>;
+
+const createWorker = multiplex(
+  (): [ChartService, Worker] => {
+    const worker = new Worker(
+      // foxglove-depcheck-used: babel-plugin-transform-import-meta
+      new URL("./worker/ChartJSMux", import.meta.url),
+    );
+    return [Comlink.wrap(worker), worker];
+  },
+  ([, worker]) => {
+    worker.terminate();
+  },
+  scheme1to1,
+);
 
 // turn a React.MouseEvent into an object we can send over rpc
 function rpcMouseEvent(event: React.MouseEvent<HTMLElement>) {
@@ -85,12 +95,6 @@ function rpcMouseEvent(event: React.MouseEvent<HTMLElement>) {
     },
   };
 }
-
-type RpcSend = <T>(
-  topic: string,
-  payload?: Record<string, unknown>,
-  transferables?: Transferable[],
-) => Promise<T>;
 
 // Chart component renders data using workers with chartjs offscreen canvas
 
@@ -126,8 +130,7 @@ function Chart(props: Props): JSX.Element {
     onFinishRender,
   } = props;
 
-  const sendWrapperRef = useRef<RpcSend | undefined>();
-  const rpcSendRef = useRef<RpcSend | undefined>();
+  const serviceRef = useRef<ChartService | undefined>();
 
   const hasPannedSinceMouseDown = useRef(false);
   const queuedUpdates = useRef<PartialUpdate[]>([]);
@@ -136,39 +139,28 @@ function Chart(props: Props): JSX.Element {
 
   useLayoutEffect(() => {
     log.info(`Register Chart ${id}`);
-    let rpc: Rpc;
+    let service: ChartService;
+    let dispose: () => void = () => {};
+
     if (supportsOffscreenCanvas) {
-      rpc = webWorkerManager.registerWorkerListener(id);
+      const [[instance], disposeWorker] = createWorker();
+      service = instance;
+      dispose = disposeWorker;
     } else {
-      const { local, remote } = createLinkedChannels();
-      new ChartJsMux(new Rpc(remote));
-      rpc = new Rpc(local);
+      service = ChartJsMux as ChartService;
     }
 
-    // helper function to send rpc to our worker - all invocations need an _id_ so we inject it here
-    const sendWrapper = async <T,>(
-      topic: string,
-      payload?: Record<string, unknown>,
-      transferables?: Transferable[],
-    ) => {
-      return await rpc.send<T>(topic, { id, ...payload }, transferables);
-    };
-
-    // store the send wrapper so it can be set to rpcSendRef once initialization occurs
-    sendWrapperRef.current = sendWrapper;
+    serviceRef.current = service;
 
     return () => {
+      dispose();
       log.info(`Unregister chart ${id}`);
-      sendWrapper("destroy").catch(() => {}); // may fail if worker is torn down
-      rpcSendRef.current = undefined;
-      sendWrapperRef.current = undefined;
+      service.destroy(id).catch(() => {}); // may fail if worker is torn down
+      serviceRef.current = undefined;
       initialized.current = false;
       previousUpdateMessage.current = {};
       canvasRef.current?.remove();
       canvasRef.current = undefined;
-      if (supportsOffscreenCanvas) {
-        webWorkerManager.unregisterWorkerListener(id);
-      }
     };
   }, [id]);
 
@@ -244,8 +236,8 @@ function Chart(props: Props): JSX.Element {
   // Flush all new updates to the worker, coalescing them together if there is
   // more than one.
   const flushUpdates = useCallback(
-    async (send: RpcSend | undefined) => {
-      if (send == undefined || isSending.current) {
+    async (service: ChartService | undefined) => {
+      if (service == undefined || isSending.current) {
         return;
       }
 
@@ -261,7 +253,7 @@ function Chart(props: Props): JSX.Element {
         // possible when we fall behind
         const coalesced = R.mergeAll(updates);
         onStartRender?.();
-        const scales = await send<RpcScales>("update", coalesced);
+        const scales = await service.update(id, coalesced);
         maybeUpdateScales(scales);
         onFinishRender?.();
         queuedUpdates.current = queuedUpdates.current.slice(updates.length);
@@ -277,14 +269,14 @@ function Chart(props: Props): JSX.Element {
     async (update: PartialUpdate) => {
       if (initialized.current) {
         queuedUpdates.current = [...queuedUpdates.current, update];
-        await flushUpdates(rpcSendRef.current);
+        await flushUpdates(serviceRef.current);
         return;
       }
 
       // first time initialization
       assert(canvasRef.current == undefined, "Canvas has already been initialized");
       assert(containerRef.current, "No container ref");
-      assert(sendWrapperRef.current, "No RPC");
+      assert(serviceRef.current, "No RPC");
 
       const canvas = document.createElement("canvas");
       canvas.style.width = "100%";
@@ -301,24 +293,17 @@ function Chart(props: Props): JSX.Element {
         typeof canvas.transferControlToOffscreen === "function"
           ? canvas.transferControlToOffscreen()
           : canvas;
-      const scales = await sendWrapperRef.current<RpcScales>(
-        "initialize",
-        {
-          node: offscreenCanvas,
-          type,
-          data: update.data,
-          typedData: update.typedData,
-          options: update.options,
-          devicePixelRatio,
-          width: update.width,
-          height: update.height,
-        },
-        [
-          // If this is actually a HTMLCanvasElement then it will not be transferred because we
-          // don't use a worker
-          offscreenCanvas as OffscreenCanvas,
-        ],
-      );
+
+      const scales = await serviceRef.current.initialize(id, {
+        node: offscreenCanvas,
+        type,
+        data: update.data,
+        typedData: update.typedData,
+        options: update.options,
+        devicePixelRatio,
+        width: update.width,
+        height: update.height,
+      });
       maybeUpdateScales(scales);
       onFinishRender?.();
 
@@ -331,9 +316,7 @@ function Chart(props: Props): JSX.Element {
       // To prevent this from happening, we put this update at the beginning of
       // the queue so that it gets coalesced properly.
       queuedUpdates.current = [update, ...queuedUpdates.current];
-      await flushUpdates(sendWrapperRef.current);
-      // once we are initialized, we can allow other handlers to send to the rpc endpoint
-      rpcSendRef.current = sendWrapperRef.current;
+      await flushUpdates(serviceRef.current);
     },
     [maybeUpdateScales, onFinishRender, onStartRender, type, flushUpdates],
   );
@@ -371,60 +354,54 @@ function Chart(props: Props): JSX.Element {
     hammerManager.on("panstart", async (event) => {
       hasPannedSinceMouseDown.current = true;
 
-      if (!rpcSendRef.current) {
+      if (!serviceRef.current) {
         return;
       }
 
       const boundingRect = event.target.getBoundingClientRect();
-      await rpcSendRef.current<RpcScales>("panstart", {
-        event: {
-          cancelable: false,
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          center: {
-            x: event.center.x,
-            y: event.center.y,
-          },
-          target: {
-            boundingClientRect: boundingRect.toJSON(),
-          },
+      await serviceRef.current.panstart(id, {
+        cancelable: false,
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        center: {
+          x: event.center.x,
+          y: event.center.y,
+        },
+        target: {
+          boundingClientRect: boundingRect.toJSON(),
         },
       });
     });
 
     hammerManager.on("panmove", async (event) => {
-      if (!rpcSendRef.current) {
+      if (!serviceRef.current) {
         return;
       }
 
       const boundingRect = event.target.getBoundingClientRect();
-      const scales = await rpcSendRef.current<RpcScales>("panmove", {
-        event: {
-          cancelable: false,
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          target: {
-            boundingClientRect: boundingRect.toJSON(),
-          },
+      const scales = await serviceRef.current.panmove(id, {
+        cancelable: false,
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        target: {
+          boundingClientRect: boundingRect.toJSON(),
         },
       });
       maybeUpdateScales(scales, { userInteraction: true });
     });
 
     hammerManager.on("panend", async (event) => {
-      if (!rpcSendRef.current) {
+      if (!serviceRef.current) {
         return;
       }
 
       const boundingRect = event.target.getBoundingClientRect();
-      const scales = await rpcSendRef.current<RpcScales>("panend", {
-        event: {
-          cancelable: false,
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          target: {
-            boundingClientRect: boundingRect.toJSON(),
-          },
+      const scales = await serviceRef.current.panend(id, {
+        cancelable: false,
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        target: {
+          boundingClientRect: boundingRect.toJSON(),
         },
       });
       maybeUpdateScales(scales, { userInteraction: true });
@@ -437,21 +414,19 @@ function Chart(props: Props): JSX.Element {
 
   const onWheel = useCallback(
     async (event: React.WheelEvent<HTMLElement>) => {
-      if (!zoomEnabled || !rpcSendRef.current) {
+      if (!zoomEnabled || !serviceRef.current) {
         return;
       }
 
       const boundingRect = event.currentTarget.getBoundingClientRect();
-      const scales = await rpcSendRef.current<RpcScales>("wheel", {
-        event: {
-          cancelable: false,
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          clientX: event.clientX,
-          clientY: event.clientY,
-          target: {
-            boundingClientRect: boundingRect.toJSON(),
-          },
+      const scales = await serviceRef.current.wheel(id, {
+        cancelable: false,
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: {
+          boundingClientRect: boundingRect.toJSON(),
         },
       });
       maybeUpdateScales(scales, { userInteraction: true });
@@ -463,13 +438,11 @@ function Chart(props: Props): JSX.Element {
     async (event: React.MouseEvent<HTMLElement>) => {
       hasPannedSinceMouseDown.current = false;
 
-      if (!rpcSendRef.current) {
+      if (!serviceRef.current) {
         return;
       }
 
-      const scales = await rpcSendRef.current<RpcScales>("mousedown", {
-        event: rpcMouseEvent(event),
-      });
+      const scales = await serviceRef.current.mousedown(id, rpcMouseEvent(event));
 
       maybeUpdateScales(scales);
     },
@@ -477,13 +450,11 @@ function Chart(props: Props): JSX.Element {
   );
 
   const onMouseUp = useCallback(async (event: React.MouseEvent<HTMLElement>) => {
-    if (!rpcSendRef.current) {
+    if (!serviceRef.current) {
       return;
     }
 
-    return await rpcSendRef.current("mouseup", {
-      event: rpcMouseEvent(event),
-    });
+    return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
   }, []);
 
   // Since hover events are handled via rpc, we might get a response back when we've
@@ -496,13 +467,11 @@ function Chart(props: Props): JSX.Element {
     async (event: React.MouseEvent<HTMLElement>) => {
       mousePresentRef.current = true; // The mouse must be present if we're getting this event.
 
-      if (onHover == undefined || rpcSendRef.current == undefined) {
+      if (onHover == undefined || serviceRef.current == undefined) {
         return;
       }
 
-      const elements = await rpcSendRef.current<RpcElement[]>("getElementsAtEvent", {
-        event: rpcMouseEvent(event),
-      });
+      const elements = await serviceRef.current.getElementsAtEvent(id, rpcMouseEvent(event));
 
       // Check mouse presence again in case the mouse has left the canvas while we
       // were waiting for the RPC call.
@@ -527,7 +496,7 @@ function Chart(props: Props): JSX.Element {
     async (event: React.MouseEvent<HTMLElement>): Promise<void> => {
       if (
         !props.onClick ||
-        !rpcSendRef.current ||
+        !serviceRef.current ||
         !isMounted() ||
         hasPannedSinceMouseDown.current // Don't send click event if it was part of a pan gesture.
       ) {
@@ -540,8 +509,10 @@ function Chart(props: Props): JSX.Element {
 
       // maybe we should forward the click event and add support for datalabel listeners
       // the rpc channel doesn't have a way to send rpc back...
-      const datalabel = await rpcSendRef.current("getDatalabelAtEvent", {
-        event: { x: mouseX, y: mouseY, type: "click" },
+      const datalabel = await serviceRef.current.getDatalabelAtEvent(id, {
+        x: mouseX,
+        y: mouseY,
+        type: "click",
       });
 
       let xVal: number | undefined;

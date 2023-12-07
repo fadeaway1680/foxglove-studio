@@ -11,6 +11,7 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
+import * as Comlink from "comlink";
 import {
   CategoryScale,
   Chart,
@@ -32,26 +33,19 @@ import {
 import AnnotationPlugin from "chartjs-plugin-annotation";
 
 import PlexMono from "@foxglove/studio-base/styles/assets/PlexMono.woff2";
-import Rpc from "@foxglove/studio-base/util/Rpc";
-import { setupWorker } from "@foxglove/studio-base/util/RpcWorkerUtils";
+import { inWebWorker } from "@foxglove/studio-base/util/workers";
 
 import ChartJSManager, { InitOpts } from "./ChartJSManager";
 import { TypedChartData } from "../types";
 
-type RpcEvent<EventType> = { id: string; event: EventType };
-
-export type ChartUpdateMessage = {
+export type ChartUpdate = {
   data?: ChartData<"scatter">;
   typedData?: TypedChartData;
   height?: number;
   options?: ChartOptions;
-  isBoundsReset: boolean;
+  isBoundsReset?: boolean;
   width?: number;
 };
-
-type RpcUpdateEvent = {
-  id: string;
-} & ChartUpdateMessage;
 
 // Explicitly load the "Plex Mono" font, since custom fonts from the main renderer are not inherited
 // by web workers. This is required to draw "Plex Mono" on an OffscreenCanvas, and it also appears
@@ -97,6 +91,7 @@ const fixedNumberFormat = new Intl.NumberFormat(undefined, {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
 /**
  * Adjust the `ticks` of the chart options to ensure the first/last x labels remain a constant
  * width. See https://github.com/foxglove/studio/issues/2926
@@ -104,7 +99,7 @@ const fixedNumberFormat = new Intl.NumberFormat(undefined, {
  * Because this requires passing a `callback` function for the tick options, this has to be done in
  * the worker, since functions can't be sent via postMessage.
  */
-function fixTicks(args: RpcUpdateEvent): RpcUpdateEvent {
+function fixTicks(args: ChartUpdate): ChartUpdate {
   const xScale = args.options?.scales?.x;
 
   if (xScale?.ticks) {
@@ -120,68 +115,60 @@ function fixTicks(args: RpcUpdateEvent): RpcUpdateEvent {
   return args;
 }
 
-// Since we use a capped number of web-workers, a single web-worker may be running multiple chartjs instances
-// The ChartJsWorkerMux forwards an rpc request for a specific chartjs instance id to the appropriate instance
-export default class ChartJsMux {
-  readonly #rpc: Rpc;
-  readonly #managers = new Map<string, ChartJSManager>();
+let managers = new Map<string, ChartJSManager>();
 
-  public constructor(rpc: Rpc) {
-    this.#rpc = rpc;
-
-    if (typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope) {
-      setupWorker(this.#rpc);
-    }
-
-    // create a new chartjs instance
-    // this must be done before sending any other rpc requests to the instance
-    rpc.receive("initialize", (args: InitOpts) => {
-      args.fontLoaded = fontLoaded;
-      const manager = new ChartJSManager(args);
-      this.#managers.set(args.id, manager);
-      return manager.getScales();
-    });
-    rpc.receive("wheel", (args: RpcEvent<WheelEvent>) => this.#getChart(args.id).wheel(args.event));
-    rpc.receive("mousedown", (args: RpcEvent<MouseEvent>) =>
-      this.#getChart(args.id).mousedown(args.event),
-    );
-    rpc.receive("mousemove", (args: RpcEvent<MouseEvent>) =>
-      this.#getChart(args.id).mousemove(args.event),
-    );
-    rpc.receive("mouseup", (args: RpcEvent<MouseEvent>) =>
-      this.#getChart(args.id).mouseup(args.event),
-    );
-    rpc.receive("panstart", (args: RpcEvent<HammerInput>) =>
-      this.#getChart(args.id).panstart(args.event),
-    );
-    rpc.receive("panend", (args: RpcEvent<HammerInput>) =>
-      this.#getChart(args.id).panend(args.event),
-    );
-    rpc.receive("panmove", (args: RpcEvent<HammerInput>) =>
-      this.#getChart(args.id).panmove(args.event),
-    );
-
-    rpc.receive("update", (args: RpcUpdateEvent) => this.#getChart(args.id).update(fixTicks(args)));
-    rpc.receive("destroy", (args: RpcEvent<void>) => {
-      const manager = this.#managers.get(args.id);
-      if (manager) {
-        manager.destroy();
-        this.#managers.delete(args.id);
-      }
-    });
-    rpc.receive("getElementsAtEvent", (args: RpcEvent<MouseEvent>) =>
-      this.#getChart(args.id).getElementsAtEvent(args),
-    );
-    rpc.receive("getDatalabelAtEvent", (args: RpcEvent<Event>) =>
-      this.#getChart(args.id).getDatalabelAtEvent(args),
-    );
+const getChart = (id: string): ChartJSManager => {
+  const chart = managers.get(id);
+  if (!chart) {
+    throw new Error(`Could not find chart with id ${id}`);
   }
+  return chart;
+};
 
-  #getChart(id: string): ChartJSManager {
-    const chart = this.#managers.get(id);
-    if (!chart) {
-      throw new Error(`Could not find chart with id ${id}`);
+export const service = {
+  // create a new chartjs instance
+  // this must be done before sending any other rpc requests to the instance
+  initialize: (id: string, opts: InitOpts) => {
+    opts.fontLoaded = fontLoaded;
+    const manager = new ChartJSManager(opts);
+    managers.set(id, manager);
+    return manager.getScales();
+  },
+  wheel: (id: string, event: WheelEvent) => getChart(id).wheel(event),
+  mousedown: (id: string, event: MouseEvent) => getChart(id).mousedown(event),
+  mousemove: (id: string, event: MouseEvent) => getChart(id).mousemove(event),
+  mouseup: (id: string, event: MouseEvent) => getChart(id).mouseup(event),
+  panstart: (id: string, event: HammerInput) => getChart(id).panstart(event),
+  panend: (id: string, event: HammerInput) => getChart(id).panend(event),
+  panmove: (id: string, event: HammerInput) => getChart(id).panmove(event),
+  update: (id: string, event: ChartUpdate) => getChart(id).update(fixTicks(event)),
+  destroy: (id: string) => {
+    const manager = managers.get(id);
+    if (manager) {
+      manager.destroy();
+      managers.delete(id);
     }
-    return chart;
-  }
+  },
+  getElementsAtEvent: (id: string, event: MouseEvent) => getChart(id).getElementsAtEvent(event),
+  getDatalabelAtEvent: (id: string, event: Event) => getChart(id).getDatalabelAtEvent(event),
+};
+
+export const mainThread = {
+  initialize: async (id: string, opts: InitOpts) => service.initialize(id, opts),
+  wheel: async (id: string, event: WheelEvent) => service.wheel(id, event),
+  mousedown: async (id: string, event: MouseEvent) => service.mousedown(id, event),
+  mousemove: async (id: string, event: MouseEvent) => service.mousemove(id, event),
+  mouseup: async (id: string, event: MouseEvent) => service.mouseup(id, event),
+  panstart: async (id: string, event: HammerInput) => service.panstart(id, event),
+  panend: async (id: string, event: HammerInput) => service.panend(id, event),
+  panmove: async (id: string, event: HammerInput) => service.panmove(id, event),
+  update: async (id: string, event: ChartUpdate) => service.update(id, event),
+  destroy: async (id: string) => service.destroy(id),
+  getElementsAtEvent: async (id: string, event: MouseEvent) =>
+    service.getElementsAtEvent(id, event),
+  getDatalabelAtEvent: async (id: string, event: Event) => service.getDatalabelAtEvent(id, event),
+};
+
+if (inWebWorker()) {
+  Comlink.expose(service);
 }
