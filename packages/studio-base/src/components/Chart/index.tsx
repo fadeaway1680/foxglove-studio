@@ -445,13 +445,16 @@ function Chart(props: Props): JSX.Element {
     [id, maybeUpdateScales],
   );
 
-  const onMouseUp = useCallback(async (event: React.MouseEvent<HTMLElement>) => {
-    if (!serviceRef.current) {
-      return;
-    }
+  const onMouseUp = useCallback(
+    async (event: React.MouseEvent<HTMLElement>) => {
+      if (!serviceRef.current) {
+        return;
+      }
 
-    return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
-  }, [id]);
+      return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
+    },
+    [id],
+  );
 
   // Since hover events are handled via rpc, we might get a response back when we've
   // already hovered away from the chart. We gate calling onHover by whether the mouse is still
