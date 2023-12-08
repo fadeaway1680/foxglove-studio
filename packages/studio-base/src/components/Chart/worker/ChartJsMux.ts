@@ -15,8 +15,6 @@ import * as Comlink from "comlink";
 import {
   CategoryScale,
   Chart,
-  ChartData,
-  ChartOptions,
   Filler,
   Legend,
   LinearScale,
@@ -121,7 +119,7 @@ const chartMethod = <T, S>(handler: (chart: ChartJSManager) => (event: T) => S) 
   return (id: string, event: T) => {
     const chart = getChart(id);
     const method = handler(chart);
-    return method(event);
+    return method.apply(chart, [event]);
   };
 };
 

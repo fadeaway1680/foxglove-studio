@@ -224,8 +224,7 @@ export default class ChartJSManager {
   public wheel(params: FakeMouseEvent & DeltaEvent): RpcScales {
     const event = createMouse(params) as WheelEvent;
     applyDelta(params, event);
-
-    this.#fakeNodeEvents.emit("wheel", params);
+    this.#fakeNodeEvents.emit("wheel", event);
     return this.getScales();
   }
 
