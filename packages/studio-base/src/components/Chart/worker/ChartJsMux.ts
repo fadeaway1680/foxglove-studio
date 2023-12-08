@@ -11,6 +11,10 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
+// Disabling this allows us to make this code marginally less repetitive.
+// Instead, we handle binding `this` explicitly.
+/* eslint-disable @typescript-eslint/unbound-method */
+
 import {
   CategoryScale,
   Chart,
