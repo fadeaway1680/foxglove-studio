@@ -46,6 +46,15 @@ export type InitOpts = {
   devicePixelRatio: number;
 };
 
+export type ChartUpdate = {
+  data?: ChartData<"scatter">;
+  typedData?: TypedChartData;
+  height?: number;
+  options?: ChartOptions;
+  isBoundsReset?: boolean;
+  width?: number;
+};
+
 // allows us to override the chart.ctx instance field which zoom plugin uses for adding event listeners
 type MutableContext<T> = Omit<Chart, "ctx"> & { ctx: T };
 
@@ -270,14 +279,7 @@ export default class ChartJSManager {
     isBoundsReset,
     data,
     typedData,
-  }: {
-    options?: ChartOptions;
-    width?: number;
-    height?: number;
-    isBoundsReset: boolean;
-    data?: ChartData<"scatter">;
-    typedData?: TypedChartData;
-  }): RpcScales {
+  }: ChartUpdate): RpcScales {
     const instance = this.#chartInstance;
     if (instance == undefined) {
       return {};

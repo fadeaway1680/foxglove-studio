@@ -19,12 +19,10 @@ import { v4 as uuidv4 } from "uuid";
 
 import { type ZoomPluginOptions } from "@foxglove/chartjs-plugin-zoom/types/options";
 import Logger from "@foxglove/log";
-import {
-  ChartUpdate,
-  mainThread as ChartJsMux,
-} from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
+import { mainThread as ChartJsMux } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
 import {
   InitOpts,
+  ChartUpdate,
   FakeMouseEvent,
 } from "@foxglove/studio-base/components/Chart/worker/ChartJSManager";
 import { mightActuallyBePartial } from "@foxglove/studio-base/util/mightActuallyBePartial";

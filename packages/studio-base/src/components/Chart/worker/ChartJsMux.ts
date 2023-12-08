@@ -35,17 +35,7 @@ import AnnotationPlugin from "chartjs-plugin-annotation";
 import PlexMono from "@foxglove/studio-base/styles/assets/PlexMono.woff2";
 import { inWebWorker } from "@foxglove/studio-base/util/workers";
 
-import ChartJSManager, { InitOpts } from "./ChartJSManager";
-import { TypedChartData } from "../types";
-
-export type ChartUpdate = {
-  data?: ChartData<"scatter">;
-  typedData?: TypedChartData;
-  height?: number;
-  options?: ChartOptions;
-  isBoundsReset?: boolean;
-  width?: number;
-};
+import ChartJSManager, { InitOpts, ChartUpdate } from "./ChartJSManager";
 
 // Explicitly load the "Plex Mono" font, since custom fonts from the main renderer are not inherited
 // by web workers. This is required to draw "Plex Mono" on an OffscreenCanvas, and it also appears
@@ -100,18 +90,20 @@ const fixedNumberFormat = new Intl.NumberFormat(undefined, {
  * the worker, since functions can't be sent via postMessage.
  */
 function fixTicks(args: ChartUpdate): ChartUpdate {
-  const xScale = args.options?.scales?.x;
-
-  if (xScale?.ticks) {
-    xScale.ticks.callback = function (value, index, ticks) {
-      // use a fixed formatter for the first/last ticks
-      if (index === 0 || index === ticks.length - 1) {
-        return fixedNumberFormat.format(value as number);
-      }
-      // otherwise use chart.js's default formatter
-      return Ticks.formatters.numeric.apply(this, [value as number, index, ticks]);
-    };
+  const ticks = args.options?.scales?.x?.ticks;
+  if (ticks == undefined) {
+    return args;
   }
+
+  ticks.callback = function (value, index, ticks) {
+    // use a fixed formatter for the first/last ticks
+    if (index === 0 || index === ticks.length - 1) {
+      return fixedNumberFormat.format(value as number);
+    }
+    // otherwise use chart.js's default formatter
+    return Ticks.formatters.numeric.apply(this, [value as number, index, ticks]);
+  };
+
   return args;
 }
 
