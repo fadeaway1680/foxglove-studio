@@ -36,7 +36,7 @@ import PlexMono from "@foxglove/studio-base/styles/assets/PlexMono.woff2";
 import { inWebWorker } from "@foxglove/studio-base/util/workers";
 
 import ChartJSManager, { InitOpts } from "./ChartJSManager";
-import { TypedChartData, RpcScales } from "../types";
+import { TypedChartData } from "../types";
 
 export type ChartUpdate = {
   data?: ChartData<"scatter">;
@@ -125,7 +125,7 @@ const getChart = (id: string): ChartJSManager => {
   return chart;
 };
 
-const chartEvent = <T>(handler: (chart: ChartJSManager) => (event: T) => RpcScales) => {
+const chartMethod = <T, S>(handler: (chart: ChartJSManager) => (event: T) => S) => {
   return (id: string, event: T) => {
     const chart = getChart(id);
     const method = handler(chart);
@@ -141,13 +141,13 @@ export const service = {
     managers.set(id, manager);
     return manager.getScales();
   },
-  wheel: chartEvent((chart) => chart.wheel),
-  mousedown: chartEvent((chart) => chart.mousedown),
-  mousemove: chartEvent((chart) => chart.mousemove),
-  mouseup: chartEvent((chart) => chart.mouseup),
-  panstart: chartEvent((chart) => chart.panstart),
-  panend: chartEvent((chart) => chart.panend),
-  panmove: chartEvent((chart) => chart.panmove),
+  wheel: chartMethod((chart) => chart.wheel),
+  mousedown: chartMethod((chart) => chart.mousedown),
+  mousemove: chartMethod((chart) => chart.mousemove),
+  mouseup: chartMethod((chart) => chart.mouseup),
+  panstart: chartMethod((chart) => chart.panstart),
+  panend: chartMethod((chart) => chart.panend),
+  panmove: chartMethod((chart) => chart.panmove),
   update: (id: string, event: ChartUpdate) => getChart(id).update(fixTicks(event)),
   destroy: (id: string) => {
     const manager = managers.get(id);
@@ -156,8 +156,8 @@ export const service = {
       managers.delete(id);
     }
   },
-  getElementsAtEvent: (id: string, event: MouseEvent) => getChart(id).getElementsAtEvent(event),
-  getDatalabelAtEvent: (id: string, event: Event) => getChart(id).getDatalabelAtEvent(event),
+  getElementsAtEvent: chartMethod((chart) => chart.getElementsAtEvent),
+  getDatalabelAtEvent: chartMethod((chart) => chart.getDatalabelAtEvent),
 };
 
 const toAsync = <T extends (...args: any) => any>(f: T) => {

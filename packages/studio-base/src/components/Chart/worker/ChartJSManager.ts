@@ -130,6 +130,18 @@ const applyDelta = (delta: DeltaEvent, event: DeltaEvent) => {
   event.deltaY = delta.deltaY;
 };
 
+export type FakeMouseEvent = RectEvent & {
+  clientX: number;
+  clientY: number;
+};
+
+const createMouse = (params: FakeMouseEvent): MouseEvent => {
+  const { clientX, clientY } = params;
+  const event = { target: {}, clientX, clientY, cancelable: false } as MouseEvent;
+  applyRect(params, event);
+  return event;
+};
+
 const createHammer = (): HammerInput =>
   ({
     target: {},
@@ -200,52 +212,54 @@ export default class ChartJSManager {
     this.#chartInstance = chartInstance;
   }
 
-  public wheel(event: WheelEvent, boundingClientRect: DOMRect): RpcScales {
-    applyRect(boundingClientRect, event);
-    this.#fakeNodeEvents.emit("wheel", event);
+  public wheel(params: FakeMouseEvent & DeltaEvent): RpcScales {
+    const event = createMouse(params) as WheelEvent;
+    applyDelta(params, event);
+
+    this.#fakeNodeEvents.emit("wheel", params);
     return this.getScales();
   }
 
-  public mousedown(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    applyRect(boundingClientRect, event);
+  public mousedown(params: FakeMouseEvent): RpcScales {
+    const event = createMouse(params);
     this.#fakeNodeEvents.emit("mousedown", event);
     return this.getScales();
   }
 
-  public mousemove(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    applyRect(boundingClientRect, event);
+  public mousemove(params: FakeMouseEvent): RpcScales {
+    const event = createMouse(params);
     this.#fakeNodeEvents.emit("mousemove", event);
     return this.getScales();
   }
 
-  public mouseup(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    applyRect(boundingClientRect, event);
+  public mouseup(params: FakeMouseEvent): RpcScales {
+    const event = createMouse(params);
     this.#fakeDocumentEvents.emit("mouseup", event);
     return this.getScales();
   }
 
-  public panstart(event: PanStartEvent): RpcScales {
-    const hammer = createHammer();
-    applyRect(event, hammer);
-    applyDelta(event, hammer);
-    hammer.center = event.center;
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panStartHandler(hammer);
+  public panstart(params: PanStartEvent): RpcScales {
+    const event = createHammer();
+    applyRect(params, event);
+    applyDelta(params, event);
+    event.center = params.center;
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panStartHandler(event);
     return this.getScales();
   }
 
-  public panmove(event: PanEvent): RpcScales {
-    const hammer = createHammer();
-    applyRect(event, hammer);
-    applyDelta(event, hammer);
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panHandler(hammer);
+  public panmove(params: PanEvent): RpcScales {
+    const event = createHammer();
+    applyRect(params, event);
+    applyDelta(params, event);
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panHandler(event);
     return this.getScales();
   }
 
-  public panend(event: PanEvent): RpcScales {
-    const hammer = createHammer();
-    applyRect(event, hammer);
-    applyDelta(event, hammer);
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panEndHandler(hammer);
+  public panend(params: PanEvent): RpcScales {
+    const event = createHammer();
+    applyRect(params, event);
+    applyDelta(params, event);
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panEndHandler(event);
     return this.getScales();
   }
 
@@ -347,7 +361,7 @@ export default class ChartJSManager {
     this.#chartInstance?.destroy();
   }
 
-  public getElementsAtEvent(event: MouseEvent): RpcElement[] {
+  public getElementsAtEvent(event: FakeMouseEvent): RpcElement[] {
     const ev = {
       native: true,
       x: event.clientX,
@@ -401,7 +415,7 @@ export default class ChartJSManager {
     return out;
   }
 
-  public getDatalabelAtEvent(event: Event): unknown {
+  public getDatalabelAtEvent(event: { x: number; y: number; type: string }): unknown {
     this.#chartInstance?.notifyPlugins("beforeEvent", { event });
 
     // clear the stored click context - we have consumed it

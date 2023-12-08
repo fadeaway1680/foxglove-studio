@@ -23,7 +23,10 @@ import {
   ChartUpdate,
   mainThread as ChartJsMux,
 } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
-import { InitOpts } from "@foxglove/studio-base/components/Chart/worker/ChartJSManager";
+import {
+  InitOpts,
+  FakeMouseEvent,
+} from "@foxglove/studio-base/components/Chart/worker/ChartJSManager";
 import { mightActuallyBePartial } from "@foxglove/studio-base/util/mightActuallyBePartial";
 import { multiplex, scheme1to1 } from "@foxglove/den/workers";
 
@@ -84,16 +87,12 @@ const createWorker = multiplex(
 );
 
 // turn a React.MouseEvent into an object we can send over rpc
-function rpcMouseEvent(event: React.MouseEvent<HTMLElement>) {
+function rpcMouseEvent(event: React.MouseEvent<HTMLElement>): FakeMouseEvent {
   const boundingRect = event.currentTarget.getBoundingClientRect();
-
   return {
-    cancelable: false,
     clientX: event.clientX - boundingRect.left,
     clientY: event.clientY - boundingRect.top,
-    target: {
-      boundingClientRect: boundingRect.toJSON(),
-    },
+    boundingClientRect: boundingRect,
   };
 }
 
@@ -373,19 +372,15 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      await serviceRef.current.panstart(
-        id,
-        {
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          center: {
-            x: event.center.x,
-            y: event.center.y,
-          },
-          target: {} as HTMLElement,
+      await serviceRef.current.panstart(id, {
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        center: {
+          x: event.center.x,
+          y: event.center.y,
         },
-        event.target.getBoundingClientRect(),
-      );
+        boundingClientRect: event.target.getBoundingClientRect(),
+      });
     });
 
     hammerManager.on("panmove", async (event) => {
@@ -393,15 +388,11 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const scales = await serviceRef.current.panmove(
-        id,
-        {
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          target: {} as HTMLElement,
-        },
-        event.target.getBoundingClientRect(),
-      );
+      const scales = await serviceRef.current.panmove(id, {
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        boundingClientRect: event.target.getBoundingClientRect(),
+      });
       maybeUpdateScales(scales, { userInteraction: true });
     });
 
@@ -429,18 +420,13 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const scales = await serviceRef.current.wheel(
-        id,
-        {
-          cancelable: false,
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          clientX: event.clientX,
-          clientY: event.clientY,
-          target: {} as HTMLElement,
-        },
-        event.currentTarget.getBoundingClientRect(),
-      );
+      const scales = await serviceRef.current.wheel(id, {
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        boundingClientRect: event.currentTarget.getBoundingClientRect(),
+      });
       maybeUpdateScales(scales, { userInteraction: true });
     },
     [zoomEnabled, maybeUpdateScales],
@@ -454,11 +440,7 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const scales = await serviceRef.current.mousedown(
-        id,
-        rpcMouseEvent(event),
-        event.currentTarget.getBoundingClientRect(),
-      );
+      const scales = await serviceRef.current.mousedown(id, rpcMouseEvent(event));
 
       maybeUpdateScales(scales);
     },
@@ -470,11 +452,7 @@ function Chart(props: Props): JSX.Element {
       return;
     }
 
-    return await serviceRef.current.mouseup(
-      id,
-      rpcMouseEvent(event),
-      event.currentTarget.getBoundingClientRect(),
-    );
+    return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
   }, []);
 
   // Since hover events are handled via rpc, we might get a response back when we've
