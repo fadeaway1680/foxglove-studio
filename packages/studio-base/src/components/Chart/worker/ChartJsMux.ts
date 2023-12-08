@@ -36,7 +36,7 @@ import PlexMono from "@foxglove/studio-base/styles/assets/PlexMono.woff2";
 import { inWebWorker } from "@foxglove/studio-base/util/workers";
 
 import ChartJSManager, { InitOpts } from "./ChartJSManager";
-import { TypedChartData } from "../types";
+import { TypedChartData, RpcScales } from "../types";
 
 export type ChartUpdate = {
   data?: ChartData<"scatter">;
@@ -125,22 +125,31 @@ const getChart = (id: string): ChartJSManager => {
   return chart;
 };
 
+const chartEvent = <T>(
+  handler: (chart: ChartJSManager) => (event: T, boundingClientRect: DOMRect) => RpcScales,
+) => {
+  return (id: string, event: T, boundingClientRect: DOMRect) => {
+    const chart = getChart(id);
+    const method = handler(chart);
+    return method(event, boundingClientRect);
+  };
+};
+
 export const service = {
   // create a new chartjs instance
   // this must be done before sending any other rpc requests to the instance
   initialize: (id: string, opts: InitOpts) => {
-    opts.fontLoaded = fontLoaded;
-    const manager = new ChartJSManager(opts);
+    const manager = new ChartJSManager(id, opts, fontLoaded);
     managers.set(id, manager);
     return manager.getScales();
   },
-  wheel: (id: string, event: WheelEvent) => getChart(id).wheel(event),
-  mousedown: (id: string, event: MouseEvent) => getChart(id).mousedown(event),
-  mousemove: (id: string, event: MouseEvent) => getChart(id).mousemove(event),
-  mouseup: (id: string, event: MouseEvent) => getChart(id).mouseup(event),
-  panstart: (id: string, event: HammerInput) => getChart(id).panstart(event),
-  panend: (id: string, event: HammerInput) => getChart(id).panend(event),
-  panmove: (id: string, event: HammerInput) => getChart(id).panmove(event),
+  wheel: chartEvent((chart) => chart.wheel),
+  mousedown: chartEvent((chart) => chart.mousedown),
+  mousemove: chartEvent((chart) => chart.mousemove),
+  mouseup: chartEvent((chart) => chart.mouseup),
+  panstart: chartEvent((chart) => chart.panstart),
+  panend: chartEvent((chart) => chart.panend),
+  panmove: chartEvent((chart) => chart.panmove),
   update: (id: string, event: ChartUpdate) => getChart(id).update(fixTicks(event)),
   destroy: (id: string) => {
     const manager = managers.get(id);
@@ -153,20 +162,25 @@ export const service = {
   getDatalabelAtEvent: (id: string, event: Event) => getChart(id).getDatalabelAtEvent(event),
 };
 
+const toAsync = <T extends (...args: any) => any>(f: T) => {
+  return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+    return f(...new Array(args));
+  };
+};
+
 export const mainThread = {
-  initialize: async (id: string, opts: InitOpts) => service.initialize(id, opts),
-  wheel: async (id: string, event: WheelEvent) => service.wheel(id, event),
-  mousedown: async (id: string, event: MouseEvent) => service.mousedown(id, event),
-  mousemove: async (id: string, event: MouseEvent) => service.mousemove(id, event),
-  mouseup: async (id: string, event: MouseEvent) => service.mouseup(id, event),
-  panstart: async (id: string, event: HammerInput) => service.panstart(id, event),
-  panend: async (id: string, event: HammerInput) => service.panend(id, event),
-  panmove: async (id: string, event: HammerInput) => service.panmove(id, event),
-  update: async (id: string, event: ChartUpdate) => service.update(id, event),
-  destroy: async (id: string) => service.destroy(id),
-  getElementsAtEvent: async (id: string, event: MouseEvent) =>
-    service.getElementsAtEvent(id, event),
-  getDatalabelAtEvent: async (id: string, event: Event) => service.getDatalabelAtEvent(id, event),
+  initialize: toAsync(service.initialize),
+  wheel: toAsync(service.wheel),
+  mousedown: toAsync(service.mousedown),
+  mousemove: toAsync(service.mousemove),
+  mouseup: toAsync(service.mouseup),
+  panstart: toAsync(service.panstart),
+  panend: toAsync(service.panend),
+  panmove: toAsync(service.panmove),
+  update: toAsync(service.update),
+  destroy: toAsync(service.destroy),
+  getElementsAtEvent: toAsync(service.getElementsAtEvent),
+  getDatalabelAtEvent: toAsync(service.getDatalabelAtEvent),
 };
 
 if (inWebWorker()) {

@@ -16,6 +16,7 @@ import {
   ChartData,
   ChartOptions,
   ChartType,
+  ChartItem,
   Interaction,
   InteractionModeFunction,
   InteractionItem,
@@ -39,12 +40,10 @@ import { TypedChartData } from "../types";
 const log = Logger.getLogger(__filename);
 
 export type InitOpts = {
-  node: { canvas: HTMLCanvasElement };
+  node: ChartItem;
   type: ChartType;
-  data: ChartData<"scatter">;
-  options: ChartOptions;
+  options: ChartOptions | undefined;
   devicePixelRatio: number;
-  fontLoaded: Promise<FontFace>;
 };
 
 // allows us to override the chart.ctx instance field which zoom plugin uses for adding event listeners
@@ -112,38 +111,29 @@ const lastX: InteractionModeFunction = (chart, event, _options, useFinalPosition
 
 Interaction.modes.lastX = lastX;
 
+const setEventRect = (boundingClientRect: DOMRect, event: { target: EventTarget | null }) => {
+  const target = event.target as Element & { boundingClientRect: DOMRect };
+  target.getBoundingClientRect = () => boundingClientRect;
+};
+
 export default class ChartJSManager {
   #chartInstance?: Chart;
   #fakeNodeEvents = new EventEmitter();
   #fakeDocumentEvents = new EventEmitter();
   #lastDatalabelClickContext?: DatalabelContext;
 
-  public constructor(initOpts: InitOpts) {
-    log.info(`new ChartJSManager(id=${initOpts.id})`);
-    void this.init(initOpts);
+  public constructor(id: string, initOpts: InitOpts, fontLoaded: Promise<FontFace>) {
+    log.info(`new ChartJSManager(id=${id})`);
+    void this.init(id, initOpts, fontLoaded);
   }
 
-  public async init({
-    id,
-    node,
-    type,
-    data,
-    options,
-    devicePixelRatio,
-    fontLoaded,
-  }: InitOpts): Promise<void> {
+  public async init(
+    id: string,
+    { node, type, options, devicePixelRatio }: InitOpts,
+    fontLoaded: Promise<FontFace>,
+  ): Promise<void> {
     const font = await fontLoaded;
     log.debug(`ChartJSManager(${id}) init, default font "${font.family}" status=${font.status}`);
-
-    // the types are wrong on `init`, but we will fix this soon
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (data != undefined) {
-      for (const ds of data.datasets) {
-        ds.segment = {
-          borderColor: lineSegmentLabelColor,
-        };
-      }
-    }
 
     const fakeNode = {
       addEventListener: addEventListener(this.#fakeNodeEvents),
@@ -167,7 +157,7 @@ export default class ChartJSManager {
     };
 
     const fullOptions: ChartOptions = {
-      ...this.#addFunctionsToConfig(options),
+      ...(options != undefined ? this.#addFunctionsToConfig(options) : {}),
       devicePixelRatio,
       font: { family: fontMonospace },
       // we force responsive off since we manually trigger width/height updates on the chart
@@ -178,7 +168,8 @@ export default class ChartJSManager {
 
     const chartInstance = new Chart(node, {
       type,
-      data,
+      // We immediately update with real data after initialization
+      data: { datasets: [] },
       options: fullOptions,
       plugins: [DatalabelPlugin, ZoomPlugin],
     });
@@ -187,51 +178,44 @@ export default class ChartJSManager {
     this.#chartInstance = chartInstance;
   }
 
-  public wheel(event: WheelEvent): RpcScales {
-    const target = event.target as Element & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public wheel(event: WheelEvent, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("wheel", event);
     return this.getScales();
   }
 
-  public mousedown(event: MouseEvent): RpcScales {
-    const target = event.target as Element & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public mousedown(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("mousedown", event);
     return this.getScales();
   }
 
-  public mousemove(event: MouseEvent): RpcScales {
-    const target = event.target as Element & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public mousemove(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("mousemove", event);
     return this.getScales();
   }
 
-  public mouseup(event: MouseEvent): RpcScales {
-    const target = event.target as Element & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public mouseup(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     this.#fakeDocumentEvents.emit("mouseup", event);
     return this.getScales();
   }
 
-  public panstart(event: HammerInput): RpcScales {
-    const target = event.target as HTMLElement & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public panstart(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panStartHandler(event);
     return this.getScales();
   }
 
-  public panmove(event: HammerInput): RpcScales {
-    const target = event.target as HTMLElement & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public panmove(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panHandler(event);
     return this.getScales();
   }
 
-  public panend(event: HammerInput): RpcScales {
-    const target = event.target as HTMLElement & { boundingClientRect: DOMRect };
-    target.getBoundingClientRect = () => target.boundingClientRect;
+  public panend(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
+    setEventRect(boundingClientRect, event);
     maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panEndHandler(event);
     return this.getScales();
   }

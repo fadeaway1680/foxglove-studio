@@ -9,7 +9,7 @@
 /// <reference types="@foxglove/chartjs-plugin-zoom" />
 
 import * as Comlink from "comlink";
-import { ChartOptions } from "chart.js";
+import { ChartOptions, ChartItem } from "chart.js";
 import Hammer from "hammerjs";
 import * as R from "ramda";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -23,6 +23,7 @@ import {
   ChartUpdate,
   mainThread as ChartJsMux,
 } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
+import { InitOpts } from "@foxglove/studio-base/components/Chart/worker/ChartJSManager";
 import { mightActuallyBePartial } from "@foxglove/studio-base/util/mightActuallyBePartial";
 import { multiplex, scheme1to1 } from "@foxglove/den/workers";
 
@@ -289,21 +290,29 @@ function Chart(props: Props): JSX.Element {
       initialized.current = true;
 
       onStartRender?.();
-      const offscreenCanvas =
+
+      const offscreenCanvas: OffscreenCanvas | undefined =
         typeof canvas.transferControlToOffscreen === "function"
           ? canvas.transferControlToOffscreen()
-          : canvas;
+          : undefined;
 
-      const scales = await serviceRef.current.initialize(id, Comlink.transfer({
-        node: offscreenCanvas,
+      const node: ChartItem =
+        offscreenCanvas != undefined
+          ? (offscreenCanvas as unknown as HTMLCanvasElement)
+          : { canvas };
+
+      const initOpts: InitOpts = {
         type,
-        data: update.data,
-        typedData: update.typedData,
+        node,
         options: update.options,
         devicePixelRatio,
-        width: update.width,
-        height: update.height,
-      }, [offscreenCanvas]));
+      };
+
+      // We need to explicitly transfer the offscreenCanvas here if we're using it
+      const transferOpts: InitOpts =
+        offscreenCanvas != undefined ? Comlink.transfer(initOpts, [offscreenCanvas]) : initOpts;
+
+      const scales = await serviceRef.current.initialize(id, transferOpts);
       maybeUpdateScales(scales);
       onFinishRender?.();
 
@@ -358,19 +367,19 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const boundingRect = event.target.getBoundingClientRect();
-      await serviceRef.current.panstart(id, {
-        cancelable: false,
-        deltaY: event.deltaY,
-        deltaX: event.deltaX,
-        center: {
-          x: event.center.x,
-          y: event.center.y,
+      await serviceRef.current.panstart(
+        id,
+        {
+          deltaY: event.deltaY,
+          deltaX: event.deltaX,
+          center: {
+            x: event.center.x,
+            y: event.center.y,
+          },
+          target: {} as HTMLElement,
         },
-        target: {
-          boundingClientRect: boundingRect.toJSON(),
-        },
-      });
+        event.target.getBoundingClientRect(),
+      );
     });
 
     hammerManager.on("panmove", async (event) => {
@@ -378,15 +387,15 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const boundingRect = event.target.getBoundingClientRect();
-      const scales = await serviceRef.current.panmove(id, {
-        cancelable: false,
-        deltaY: event.deltaY,
-        deltaX: event.deltaX,
-        target: {
-          boundingClientRect: boundingRect.toJSON(),
+      const scales = await serviceRef.current.panmove(
+        id,
+        {
+          deltaY: event.deltaY,
+          deltaX: event.deltaX,
+          target: {} as HTMLElement,
         },
-      });
+        event.target.getBoundingClientRect(),
+      );
       maybeUpdateScales(scales, { userInteraction: true });
     });
 
@@ -395,15 +404,15 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const boundingRect = event.target.getBoundingClientRect();
-      const scales = await serviceRef.current.panend(id, {
-        cancelable: false,
-        deltaY: event.deltaY,
-        deltaX: event.deltaX,
-        target: {
-          boundingClientRect: boundingRect.toJSON(),
+      const scales = await serviceRef.current.panend(
+        id,
+        {
+          deltaY: event.deltaY,
+          deltaX: event.deltaX,
+          target: {} as HTMLElement,
         },
-      });
+        event.target.getBoundingClientRect(),
+      );
       maybeUpdateScales(scales, { userInteraction: true });
     });
 
@@ -418,17 +427,18 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const boundingRect = event.currentTarget.getBoundingClientRect();
-      const scales = await serviceRef.current.wheel(id, {
-        cancelable: false,
-        deltaY: event.deltaY,
-        deltaX: event.deltaX,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        target: {
-          boundingClientRect: boundingRect.toJSON(),
+      const scales = await serviceRef.current.wheel(
+        id,
+        {
+          cancelable: false,
+          deltaY: event.deltaY,
+          deltaX: event.deltaX,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          target: {} as HTMLElement,
         },
-      });
+        event.currentTarget.getBoundingClientRect(),
+      );
       maybeUpdateScales(scales, { userInteraction: true });
     },
     [zoomEnabled, maybeUpdateScales],
@@ -442,7 +452,11 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const scales = await serviceRef.current.mousedown(id, rpcMouseEvent(event));
+      const scales = await serviceRef.current.mousedown(
+        id,
+        rpcMouseEvent(event),
+        event.currentTarget.getBoundingClientRect(),
+      );
 
       maybeUpdateScales(scales);
     },
@@ -454,7 +468,11 @@ function Chart(props: Props): JSX.Element {
       return;
     }
 
-    return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
+    return await serviceRef.current.mouseup(
+      id,
+      rpcMouseEvent(event),
+      event.currentTarget.getBoundingClientRect(),
+    );
   }, []);
 
   // Since hover events are handled via rpc, we might get a response back when we've
