@@ -111,10 +111,32 @@ const lastX: InteractionModeFunction = (chart, event, _options, useFinalPosition
 
 Interaction.modes.lastX = lastX;
 
-const setEventRect = (boundingClientRect: DOMRect, event: { target: EventTarget | null }) => {
-  const target = event.target as Element & { boundingClientRect: DOMRect };
-  target.getBoundingClientRect = () => boundingClientRect;
+type RectEvent = {
+  boundingClientRect: DOMRect;
 };
+
+const applyRect = (rect: RectEvent, event: { target: EventTarget | null }) => {
+  const target = event.target as Element;
+  target.getBoundingClientRect = () => rect.boundingClientRect;
+};
+
+type DeltaEvent = {
+  deltaX: number;
+  deltaY: number;
+};
+
+const applyDelta = (delta: DeltaEvent, event: DeltaEvent) => {
+  event.deltaX = delta.deltaX;
+  event.deltaY = delta.deltaY;
+};
+
+const createHammer = (): HammerInput =>
+  ({
+    target: {},
+  }) as HammerInput;
+
+export type PanStartEvent = RectEvent & DeltaEvent & { center: HammerPoint };
+export type PanEvent = RectEvent & DeltaEvent;
 
 export default class ChartJSManager {
   #chartInstance?: Chart;
@@ -179,44 +201,51 @@ export default class ChartJSManager {
   }
 
   public wheel(event: WheelEvent, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
+    applyRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("wheel", event);
     return this.getScales();
   }
 
   public mousedown(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
+    applyRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("mousedown", event);
     return this.getScales();
   }
 
   public mousemove(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
+    applyRect(boundingClientRect, event);
     this.#fakeNodeEvents.emit("mousemove", event);
     return this.getScales();
   }
 
   public mouseup(event: MouseEvent, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
+    applyRect(boundingClientRect, event);
     this.#fakeDocumentEvents.emit("mouseup", event);
     return this.getScales();
   }
 
-  public panstart(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panStartHandler(event);
+  public panstart(event: PanStartEvent): RpcScales {
+    const hammer = createHammer();
+    applyRect(event, hammer);
+    applyDelta(event, hammer);
+    hammer.center = event.center;
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panStartHandler(hammer);
     return this.getScales();
   }
 
-  public panmove(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panHandler(event);
+  public panmove(event: PanEvent): RpcScales {
+    const hammer = createHammer();
+    applyRect(event, hammer);
+    applyDelta(event, hammer);
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panHandler(hammer);
     return this.getScales();
   }
 
-  public panend(event: HammerInput, boundingClientRect: DOMRect): RpcScales {
-    setEventRect(boundingClientRect, event);
-    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panEndHandler(event);
+  public panend(event: PanEvent): RpcScales {
+    const hammer = createHammer();
+    applyRect(event, hammer);
+    applyDelta(event, hammer);
+    maybeCast<ZoomableChart>(this.#chartInstance)?.$zoom.panEndHandler(hammer);
     return this.getScales();
   }
 

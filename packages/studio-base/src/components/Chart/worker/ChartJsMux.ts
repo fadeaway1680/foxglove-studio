@@ -125,13 +125,11 @@ const getChart = (id: string): ChartJSManager => {
   return chart;
 };
 
-const chartEvent = <T>(
-  handler: (chart: ChartJSManager) => (event: T, boundingClientRect: DOMRect) => RpcScales,
-) => {
-  return (id: string, event: T, boundingClientRect: DOMRect) => {
+const chartEvent = <T>(handler: (chart: ChartJSManager) => (event: T) => RpcScales) => {
+  return (id: string, event: T) => {
     const chart = getChart(id);
     const method = handler(chart);
-    return method(event, boundingClientRect);
+    return method(event);
   };
 };
 

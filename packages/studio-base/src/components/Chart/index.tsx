@@ -296,6 +296,12 @@ function Chart(props: Props): JSX.Element {
           ? canvas.transferControlToOffscreen()
           : undefined;
 
+      // There are some inconsistencies for the HTMLCanvasElement and
+      // OffscreenCanvas types in that they are substitutable (since they both
+      // have `getContext`), but this commonality is not reflected. As a
+      // result, an OffscreenCanvas cannot be used in place of
+      // HTMLCanvasElement despite the fact that this works without problems,
+      // at least in ChartJS's usage of HTMLCanvasElement.
       const node: ChartItem =
         offscreenCanvas != undefined
           ? (offscreenCanvas as unknown as HTMLCanvasElement)
@@ -404,15 +410,11 @@ function Chart(props: Props): JSX.Element {
         return;
       }
 
-      const scales = await serviceRef.current.panend(
-        id,
-        {
-          deltaY: event.deltaY,
-          deltaX: event.deltaX,
-          target: {} as HTMLElement,
-        },
-        event.target.getBoundingClientRect(),
-      );
+      const scales = await serviceRef.current.panend(id, {
+        deltaY: event.deltaY,
+        deltaX: event.deltaX,
+        boundingClientRect: event.target.getBoundingClientRect(),
+      });
       maybeUpdateScales(scales, { userInteraction: true });
     });
 
