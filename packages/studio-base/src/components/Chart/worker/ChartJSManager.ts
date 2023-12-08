@@ -124,6 +124,8 @@ type RectEvent = {
   boundingClientRect: DOMRect;
 };
 
+// The typing of `target` uses `null` explicitly
+// eslint-disable-next-line no-restricted-syntax
 const applyRect = (rect: RectEvent, event: { target: EventTarget | null }) => {
   const target = event.target as Element;
   target.getBoundingClientRect = () => rect.boundingClientRect;
@@ -301,13 +303,13 @@ export default class ChartJSManager {
       // min and max have been specified.
       const scales = options.scales ?? {};
       if (
-        (isBoundsReset || (scales.x?.min != undefined && scales.x.max != undefined)) &&
+        (isBoundsReset === true || (scales.x?.min != undefined && scales.x.max != undefined)) &&
         instance.options.scales
       ) {
         instance.options.scales.x = scales.x;
       }
       if (
-        (isBoundsReset || (scales.y?.min != undefined && scales.y.max != undefined)) &&
+        (isBoundsReset === true || (scales.y?.min != undefined && scales.y.max != undefined)) &&
         instance.options.scales
       ) {
         instance.options.scales.y = scales.y;

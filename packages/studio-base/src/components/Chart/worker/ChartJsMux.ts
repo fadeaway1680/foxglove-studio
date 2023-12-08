@@ -11,7 +11,6 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
-import * as Comlink from "comlink";
 import {
   CategoryScale,
   Chart,
@@ -29,11 +28,13 @@ import {
   Tooltip,
 } from "chart.js";
 import AnnotationPlugin from "chartjs-plugin-annotation";
+import * as Comlink from "comlink";
 
 import PlexMono from "@foxglove/studio-base/styles/assets/PlexMono.woff2";
 import { inWebWorker } from "@foxglove/studio-base/util/workers";
 
 import ChartJSManager, { InitOpts, ChartUpdate } from "./ChartJSManager";
+import { RpcScales } from "../types";
 
 // Explicitly load the "Plex Mono" font, since custom fonts from the main renderer are not inherited
 // by web workers. This is required to draw "Plex Mono" on an OffscreenCanvas, and it also appears
@@ -88,12 +89,12 @@ const fixedNumberFormat = new Intl.NumberFormat(undefined, {
  * the worker, since functions can't be sent via postMessage.
  */
 function fixTicks(args: ChartUpdate): ChartUpdate {
-  const ticks = args.options?.scales?.x?.ticks;
-  if (ticks == undefined) {
+  const xTicks = args.options?.scales?.x?.ticks;
+  if (xTicks == undefined) {
     return args;
   }
 
-  ticks.callback = function (value, index, ticks) {
+  xTicks.callback = function (value, index, ticks) {
     // use a fixed formatter for the first/last ticks
     if (index === 0 || index === ticks.length - 1) {
       return fixedNumberFormat.format(value as number);
@@ -105,7 +106,7 @@ function fixTicks(args: ChartUpdate): ChartUpdate {
   return args;
 }
 
-let managers = new Map<string, ChartJSManager>();
+const managers = new Map<string, ChartJSManager>();
 
 const getChart = (id: string): ChartJSManager => {
   const chart = managers.get(id);
@@ -126,7 +127,7 @@ const chartMethod = <T, S>(handler: (chart: ChartJSManager) => (event: T) => S) 
 export const service = {
   // create a new chartjs instance
   // this must be done before sending any other rpc requests to the instance
-  initialize: (id: string, opts: InitOpts) => {
+  initialize: (id: string, opts: InitOpts): RpcScales => {
     const manager = new ChartJSManager(id, opts, fontLoaded);
     managers.set(id, manager);
     return manager.getScales();
@@ -138,8 +139,8 @@ export const service = {
   panstart: chartMethod((chart) => chart.panstart),
   panend: chartMethod((chart) => chart.panend),
   panmove: chartMethod((chart) => chart.panmove),
-  update: (id: string, event: ChartUpdate) => getChart(id).update(fixTicks(event)),
-  destroy: (id: string) => {
+  update: (id: string, event: ChartUpdate): RpcScales => getChart(id).update(fixTicks(event)),
+  destroy: (id: string): void => {
     const manager = managers.get(id);
     if (manager) {
       manager.destroy();
@@ -150,6 +151,7 @@ export const service = {
   getDatalabelAtEvent: chartMethod((chart) => chart.getDatalabelAtEvent),
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAsync = <T extends (...args: any) => any>(f: T) => {
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     return f(...new Array(args));

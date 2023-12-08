@@ -8,8 +8,8 @@
 /// <reference types="chartjs-plugin-datalabels" />
 /// <reference types="@foxglove/chartjs-plugin-zoom" />
 
-import * as Comlink from "comlink";
 import { ChartOptions, ChartItem } from "chart.js";
+import * as Comlink from "comlink";
 import Hammer from "hammerjs";
 import * as R from "ramda";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -18,15 +18,15 @@ import { assert } from "ts-essentials";
 import { v4 as uuidv4 } from "uuid";
 
 import { type ZoomPluginOptions } from "@foxglove/chartjs-plugin-zoom/types/options";
+import { multiplex, scheme1to1 } from "@foxglove/den/workers";
 import Logger from "@foxglove/log";
-import { mainThread as ChartJsMux } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
 import {
   InitOpts,
   ChartUpdate,
   FakeMouseEvent,
 } from "@foxglove/studio-base/components/Chart/worker/ChartJSManager";
+import { mainThread as ChartJsMux } from "@foxglove/studio-base/components/Chart/worker/ChartJsMux";
 import { mightActuallyBePartial } from "@foxglove/studio-base/util/mightActuallyBePartial";
-import { multiplex, scheme1to1 } from "@foxglove/den/workers";
 
 import { TypedChartData, ChartData, RpcElement, RpcScales } from "./types";
 
@@ -259,7 +259,7 @@ function Chart(props: Props): JSX.Element {
 
       isSending.current = false;
     },
-    [maybeUpdateScales, onFinishRender, onStartRender],
+    [id, maybeUpdateScales, onFinishRender, onStartRender],
   );
 
   // Update the chart with a new set of data
@@ -330,7 +330,7 @@ function Chart(props: Props): JSX.Element {
       queuedUpdates.current = [update, ...queuedUpdates.current];
       await flushUpdates(serviceRef.current);
     },
-    [maybeUpdateScales, onFinishRender, onStartRender, type, flushUpdates],
+    [id, maybeUpdateScales, onFinishRender, onStartRender, type, flushUpdates],
   );
 
   const [updateError, setUpdateError] = useState<Error | undefined>();
@@ -410,7 +410,7 @@ function Chart(props: Props): JSX.Element {
     return () => {
       hammerManager.destroy();
     };
-  }, [maybeUpdateScales, panEnabled, props.options.plugins?.zoom?.pan?.threshold]);
+  }, [id, maybeUpdateScales, panEnabled, props.options.plugins?.zoom?.pan?.threshold]);
 
   const onWheel = useCallback(
     async (event: React.WheelEvent<HTMLElement>) => {
@@ -427,7 +427,7 @@ function Chart(props: Props): JSX.Element {
       });
       maybeUpdateScales(scales, { userInteraction: true });
     },
-    [zoomEnabled, maybeUpdateScales],
+    [id, zoomEnabled, maybeUpdateScales],
   );
 
   const onMouseDown = useCallback(
@@ -442,7 +442,7 @@ function Chart(props: Props): JSX.Element {
 
       maybeUpdateScales(scales);
     },
-    [maybeUpdateScales],
+    [id, maybeUpdateScales],
   );
 
   const onMouseUp = useCallback(async (event: React.MouseEvent<HTMLElement>) => {
@@ -451,7 +451,7 @@ function Chart(props: Props): JSX.Element {
     }
 
     return await serviceRef.current.mouseup(id, rpcMouseEvent(event));
-  }, []);
+  }, [id]);
 
   // Since hover events are handled via rpc, we might get a response back when we've
   // already hovered away from the chart. We gate calling onHover by whether the mouse is still
@@ -476,7 +476,7 @@ function Chart(props: Props): JSX.Element {
         onHover(elements);
       }
     },
-    [onHover, isMounted],
+    [id, onHover, isMounted],
   );
 
   const onMouseEnter = useCallback(() => {
@@ -534,7 +534,7 @@ function Chart(props: Props): JSX.Element {
         y: yVal,
       });
     },
-    [isMounted, props],
+    [id, isMounted, props],
   );
 
   if (updateError) {
