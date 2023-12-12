@@ -9,6 +9,7 @@ import { messagePathStructures } from "@foxglove/studio-base/components/MessageP
 import { Topic, MessageEvent } from "@foxglove/studio-base/players/types";
 import { RosDatatypes } from "@foxglove/studio-base/types/RosDatatypes";
 import { enumValuesByDatatypeAndField } from "@foxglove/studio-base/util/enums";
+import { isGreaterThan } from "@foxglove/rostime";
 
 import { initAccumulated, accumulate, buildPlot } from "./accumulate";
 import { rebuildClient, sendData, mapClients, noEffects, keepEffects, getAllTopics } from "./state";
@@ -92,13 +93,33 @@ export function addBlock(block: Messages, resetTopics: string[], state: State): 
 }
 
 export function addCurrent(events: readonly MessageEvent[], state: State): StateAndEffects {
-  const { current: oldCurrent } = state;
+  const { current: oldCurrent, blocks } = state;
+
+  const lastBlocks = R.map((messages) => messages.at(-1)?.receiveTime, blocks);
+  const messages = R.groupBy((v: MessageEvent) => v.topic, events);
+  // We want to ensure we don't keep current messages around that block data
+  // already has; to do so, we ignore all new current messages that occur
+  // before the last block data message for each topic
+  const newCurrent = R.mapObjIndexed((topicMessages: MessageEvent[], topic: string) => {
+    const lastBlockStamp = lastBlocks[topic];
+    if (lastBlockStamp == undefined) {
+      return topicMessages;
+    }
+
+    const keepIndex = R.findIndex(
+      (v) => isGreaterThan(v.receiveTime, lastBlockStamp),
+      topicMessages,
+    );
+    // Keep none
+    if (keepIndex === -1) {
+      return [];
+    }
+
+    return topicMessages.slice(keepIndex);
+  }, messages);
   const newState: State = {
     ...state,
-    current: R.pipe(
-      R.groupBy((v: MessageEvent) => v.topic),
-      R.mergeWith(R.concat, oldCurrent),
-    )(events),
+    current: R.mergeWith(R.concat, oldCurrent, newCurrent),
   };
 
   return R.pipe(
@@ -114,7 +135,8 @@ export function addCurrent(events: readonly MessageEvent[], state: State): State
           metadata,
           globalVariables,
           params,
-          R.map((messages) => messages.slice(-1), current),
+          // Single-message plots use only the last message anyway
+          R.map((topicMessages) => (topicMessages ?? []).slice(-1), messages),
         );
         return [client, [sendData(id, plotData)]];
       }
