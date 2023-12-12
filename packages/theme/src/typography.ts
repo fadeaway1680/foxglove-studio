@@ -50,7 +50,7 @@ export const typography: TypographyOptions = {
   button: {
     fontFeatureSettings,
     textTransform: "none",
-    fontWeight: "normal",
+    fontWeight: 600,
     letterSpacing: "-0.0125em",
   },
   overline: {
