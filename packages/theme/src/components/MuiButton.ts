@@ -14,9 +14,6 @@ export const MuiButton: OverrideComponentReturn<"MuiButton"> = {
     root: {
       transition: "none",
     },
-    outlined: {
-      fontWeight: 400,
-    },
     containedInherit: ({ theme }) => ({
       backgroundColor: theme.palette.action.focus,
     }),
