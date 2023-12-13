@@ -24,12 +24,16 @@ const log = Log.getLogger(__filename);
 
 const DEFAULT_READ_AHEAD_DURATION = { sec: 10, nsec: 0 };
 const DEFAULT_MIN_READ_AHEAD_DURATION = { sec: 1, nsec: 0 };
+const DEFAULT_MAX_CACHING_SIZE = 1073741824; // 1GB;
+const MEMORY_SAVER_MAX_CACHING_SIZE = DEFAULT_MAX_CACHING_SIZE * 0.5;
 
 type Options = {
   // How far ahead to buffer
   readAheadDuration?: Time;
   // The minimum duration to buffer before playback resumes
   minReadAheadDuration?: Time;
+
+  memorySaverEnabled?: boolean;
 };
 
 interface EventTypes {
@@ -80,7 +84,11 @@ class BufferedIterableSource extends EventEmitter<EventTypes> implements IIterab
 
     this.#readAheadDuration = opt?.readAheadDuration ?? DEFAULT_READ_AHEAD_DURATION;
     this.#minReadAheadDuration = opt?.minReadAheadDuration ?? DEFAULT_MIN_READ_AHEAD_DURATION;
-    this.#source = new CachingIterableSource(source);
+    const memorySaverEnabled = opt?.memorySaverEnabled ?? false;
+    this.#source = new CachingIterableSource(source, {
+      maxTotalSize: memorySaverEnabled ? MEMORY_SAVER_MAX_CACHING_SIZE : DEFAULT_MAX_CACHING_SIZE,
+      evictOldBlocks: memorySaverEnabled,
+    });
 
     if (compare(this.#readAheadDuration, this.#minReadAheadDuration) < 0) {
       throw new Error("Invariant: readAheadDuration < minReadAheadDuration");

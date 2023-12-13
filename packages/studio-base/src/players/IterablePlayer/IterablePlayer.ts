@@ -86,6 +86,8 @@ type IterablePlayerOptions = {
 
   // Set to _false_ to disable preloading. (default: true)
   enablePreload?: boolean;
+
+  memorySaverEnabled?: boolean;
 };
 
 type IterablePlayerState =
@@ -177,10 +179,18 @@ export class IterablePlayer implements Player {
   #resolveIsClosed: () => void = () => {};
 
   public constructor(options: IterablePlayerOptions) {
-    const { metricsCollector, urlParams, source, name, enablePreload, sourceId } = options;
+    const {
+      metricsCollector,
+      urlParams,
+      source,
+      name,
+      enablePreload,
+      sourceId,
+      memorySaverEnabled = false,
+    } = options;
 
     this.#iterableSource = source;
-    this.#bufferedSource = new BufferedIterableSource(source);
+    this.#bufferedSource = new BufferedIterableSource(source, { memorySaverEnabled });
     this.#name = name;
     this.#urlParams = urlParams;
     this.#metricsCollector = metricsCollector ?? new NoopMetricsCollector();

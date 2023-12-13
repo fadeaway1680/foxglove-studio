@@ -40,6 +40,7 @@ class Ros1LocalBagDataSourceFactory implements IDataSourceFactory {
       source,
       name: file.name,
       sourceId: this.id,
+      memorySaverEnabled: args.memorySaverEnabled,
     });
   }
 }

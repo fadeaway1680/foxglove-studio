@@ -44,6 +44,7 @@ class SampleNuscenesDataSourceFactory implements IDataSourceFactory {
       // Use blank url params so the data source is set in the url
       urlParams: {},
       sourceId: this.id,
+      memorySaverEnabled: args.memorySaverEnabled,
     });
   }
 }

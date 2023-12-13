@@ -55,6 +55,7 @@ type CacheBlock = {
 type Options = {
   maxBlockSize?: number;
   maxTotalSize?: number;
+  evictOldBlocks?: boolean;
 };
 
 interface EventTypes {
@@ -91,6 +92,9 @@ class CachingIterableSource extends EventEmitter<EventTypes> implements IIterabl
   // Maximum size per block
   #maxBlockSizeBytes: number;
 
+  // Evict old cache blocks when the current read head (playback cursor) has moved past them
+  #evictOldBlocks: boolean;
+
   // The current read head, used for determining which blocks are evictable
   #currentReadHead: Time = { sec: 0, nsec: 0 };
 
@@ -102,7 +106,8 @@ class CachingIterableSource extends EventEmitter<EventTypes> implements IIterabl
 
     this.#source = source;
     this.#maxTotalSizeBytes = opt?.maxTotalSize ?? 1073741824; // 1GB
-    this.#maxBlockSizeBytes = opt?.maxBlockSize ?? 52428800; // 50MB
+    this.#maxBlockSizeBytes = opt?.maxBlockSize ?? 5242880; // 50MB
+    this.#evictOldBlocks = opt?.evictOldBlocks ?? false;
   }
 
   public async initialize(): Promise<Initalization> {
@@ -252,6 +257,17 @@ class CachingIterableSource extends EventEmitter<EventTypes> implements IIterabl
       for await (const iterResult of sourceMessageIterator) {
         // if there is no block, we make a new block
         if (!block) {
+          // Check if we should discard the first block in the cache (block with the oldest endTime) to save
+          // memory. This can be only done if the current read head (playback cursor) is after that block's endTime.
+          if (
+            this.#evictOldBlocks &&
+            this.#cache.length > 0 &&
+            compare(subtract(this.#currentReadHead, { sec: 0, nsec: 1 }), this.#cache[0]!.end) > 0
+          ) {
+            const evictedBlock = this.#cache.splice(0, 1)[0]!;
+            this.#totalSizeBytes -= evictedBlock.size;
+          }
+
           const newBlock: CacheBlock = {
             id: this.#nextBlockId++,
             start: readHead,

@@ -18,6 +18,7 @@ import { useMountedState } from "react-use";
 import { useWarnImmediateReRender } from "@foxglove/hooks";
 import Logger from "@foxglove/log";
 import { Immutable } from "@foxglove/studio";
+import { AppSetting } from "@foxglove/studio-base/AppSetting";
 import { MessagePipelineProvider } from "@foxglove/studio-base/components/MessagePipeline";
 import { useAnalytics } from "@foxglove/studio-base/context/AnalyticsContext";
 import { useAppContext } from "@foxglove/studio-base/context/AppContext";
@@ -27,6 +28,7 @@ import PlayerSelectionContext, {
   IDataSourceFactory,
   PlayerSelection,
 } from "@foxglove/studio-base/context/PlayerSelectionContext";
+import { useAppConfigurationValue } from "@foxglove/studio-base/hooks";
 import useIndexedDbRecents, { RecentRecord } from "@foxglove/studio-base/hooks/useIndexedDbRecents";
 import AnalyticsMetricsCollector from "@foxglove/studio-base/players/AnalyticsMetricsCollector";
 import {
@@ -52,6 +54,7 @@ export default function PlayerManager(props: PropsWithChildren<PlayerManagerProp
 
   const analytics = useAnalytics();
   const metricsCollector = useMemo(() => new AnalyticsMetricsCollector(analytics), [analytics]);
+  const [memorySaverEnabled] = useAppConfigurationValue<boolean>(AppSetting.MEMORY_SAVER_ENABLED);
 
   const [basePlayer, setBasePlayer] = useState<Player | undefined>();
 
@@ -171,6 +174,7 @@ export default function PlayerManager(props: PropsWithChildren<PlayerManagerProp
                 file: multiFile ? undefined : file,
                 files: multiFile ? fileList : undefined,
                 metricsCollector,
+                memorySaverEnabled,
               });
 
               setBasePlayer(newPlayer);
@@ -196,6 +200,7 @@ export default function PlayerManager(props: PropsWithChildren<PlayerManagerProp
               const newPlayer = foundSource.initialize({
                 file,
                 metricsCollector,
+                memorySaverEnabled,
               });
 
               setBasePlayer(newPlayer);
@@ -216,7 +221,7 @@ export default function PlayerManager(props: PropsWithChildren<PlayerManagerProp
         enqueueSnackbar((error as Error).message, { variant: "error" });
       }
     },
-    [playerSources, metricsCollector, enqueueSnackbar, isMounted, addRecent],
+    [playerSources, metricsCollector, enqueueSnackbar, isMounted, addRecent, memorySaverEnabled],
   );
 
   // Select a recent entry by id
