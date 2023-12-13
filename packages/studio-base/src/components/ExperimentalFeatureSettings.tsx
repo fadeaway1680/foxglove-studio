@@ -45,6 +45,11 @@ function useFeatures(): Feature[] {
       name: t("newAppMenu"),
       description: <>{t("newAppMenuDescription")}</>,
     },
+    {
+      key: AppSetting.MEMORY_SAVER_ENABLED,
+      name: t("memorySaver"),
+      description: <>{t("memorySaverDescription")}</>,
+    },
   ];
 
   if (process.env.NODE_ENV === "development") {

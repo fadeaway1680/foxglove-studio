@@ -20,6 +20,7 @@ export enum AppSetting {
 
   // Experimental features
   SHOW_DEBUG_PANELS = "showDebugPanels",
+  MEMORY_SAVER_ENABLED = "memorySaverEnabled",
 
   // Miscellaneous
   HIDE_SIGN_IN_PROMPT = "hideSignInPrompt",
