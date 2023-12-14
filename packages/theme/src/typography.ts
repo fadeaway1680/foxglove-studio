@@ -31,7 +31,7 @@ export const fontFeatureSettings = "'tnum'";
 const headingFontStyles: TypographyStyle = {
   fontFeatureSettings,
   letterSpacing: "-0.025em",
-  fontWeight: 800,
+  fontWeight: 600,
 };
 
 const subtitleFontStyles: TypographyStyle = {
