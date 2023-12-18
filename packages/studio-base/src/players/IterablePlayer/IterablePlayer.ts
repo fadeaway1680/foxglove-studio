@@ -68,6 +68,8 @@ const MAX_BLOCKS = 400;
 // is to provide some initial data to subscribers.
 const SEEK_ON_START_NS = BigInt(99 * 1e6);
 
+const MEMORY_INFO_BUFFERED_MSGS = "Buffered messages";
+
 type IterablePlayerOptions = {
   metricsCollector?: PlayerMetricsCollectorInterface;
 
@@ -590,7 +592,7 @@ export class IterablePlayer implements Player {
     this.#setState(this.#isPlaying ? "play" : "idle");
   }
 
-  // Read a small amount of data from the datasource with the hope of producing a message or two.
+  // Read a small amount of data from the data source with the hope of producing a message or two.
   // Without an initial read, the user would be looking at a blank layout since no messages have yet
   // been delivered.
   async #stateStartPlay() {
@@ -983,6 +985,10 @@ export class IterablePlayer implements Player {
       this.#progress = {
         fullyLoadedFractionRanges: this.#bufferedSource.loadedRanges(),
         messageCache: this.#progress.messageCache,
+        memoryInfo: {
+          ...this.#progress.memoryInfo,
+          [MEMORY_INFO_BUFFERED_MSGS]: this.#bufferedSource.getCacheSize(),
+        },
       };
       this.#queueEmitState();
     };
@@ -1034,6 +1040,10 @@ export class IterablePlayer implements Player {
         this.#progress = {
           fullyLoadedFractionRanges: this.#bufferedSource.loadedRanges(),
           messageCache: this.#progress.messageCache,
+          memoryInfo: {
+            ...this.#progress.memoryInfo,
+            [MEMORY_INFO_BUFFERED_MSGS]: this.#bufferedSource.getCacheSize(),
+          },
         };
 
         // If subscriptions changed, update to the new subscriptions
@@ -1079,8 +1089,11 @@ export class IterablePlayer implements Player {
         this.#progress = {
           fullyLoadedFractionRanges: this.#progress.fullyLoadedFractionRanges,
           messageCache: progress.messageCache,
+          memoryInfo: {
+            ...this.#progress.memoryInfo,
+            ...progress.memoryInfo,
+          },
         };
-
         // If we are in playback, we will let playback queue state updates
         if (this.#state === "play") {
           return;
