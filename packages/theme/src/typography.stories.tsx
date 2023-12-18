@@ -42,7 +42,7 @@ const variants: { variant: TypographyVariant; text: string }[] = [
   { variant: "overline", text: "overline text" },
 ];
 
-export const Typography: StoryObj = {
+export const Variants: StoryObj = {
   render: function Story() {
     return (
       <Stack gap={1} padding={1}>
