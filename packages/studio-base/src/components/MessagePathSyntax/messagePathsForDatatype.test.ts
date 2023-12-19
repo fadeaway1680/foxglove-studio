@@ -12,6 +12,7 @@
 //   You may not use this file except in compliance with the License.
 
 import { unwrap } from "@foxglove/den/monads";
+import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
 import { RosDatatypes } from "@foxglove/studio-base/types/RosDatatypes";
 
 import {
@@ -493,6 +494,48 @@ describe("messagePathsForStructure", () => {
         noMultiSlices: true,
       }).map(({ path }) => path),
     ).toEqual([".some_pose.dummy_array[0]", ".some_pose.x"]);
+  });
+
+  it("preserves existing filters matching isTypicalFilterName", () => {
+    expect(
+      messagePathsForStructure(unwrap(structures["tf/tfMessage"]), {
+        messagePath: parseRosPath('/tf.transforms[:]{child_frame_id=="foo"}')!.messagePath,
+      }).map(({ path }) => path),
+    ).toEqual([
+      "",
+      ".transforms",
+      '.transforms[:]{child_frame_id=="foo"}',
+      '.transforms[:]{child_frame_id=="foo"}.child_frame_id',
+      '.transforms[:]{child_frame_id=="foo"}.header',
+      '.transforms[:]{child_frame_id=="foo"}.header.frame_id',
+      '.transforms[:]{child_frame_id=="foo"}.header.seq',
+      '.transforms[:]{child_frame_id=="foo"}.header.stamp',
+      '.transforms[:]{child_frame_id=="foo"}.header.stamp.nsec',
+      '.transforms[:]{child_frame_id=="foo"}.header.stamp.sec',
+      '.transforms[:]{child_frame_id=="foo"}.transform',
+      '.transforms[:]{child_frame_id=="foo"}.transform.rotation',
+      '.transforms[:]{child_frame_id=="foo"}.transform.translation',
+    ]);
+
+    expect(
+      messagePathsForStructure(unwrap(structures["tf/tfMessage"]), {
+        messagePath: parseRosPath("/tf.transforms[:]{header.stamp.sec==0}")!.messagePath,
+      }).map(({ path }) => path),
+    ).toEqual([
+      "",
+      ".transforms",
+      '.transforms[:]{child_frame_id==""}',
+      '.transforms[:]{child_frame_id==""}.child_frame_id',
+      '.transforms[:]{child_frame_id==""}.header',
+      '.transforms[:]{child_frame_id==""}.header.frame_id',
+      '.transforms[:]{child_frame_id==""}.header.seq',
+      '.transforms[:]{child_frame_id==""}.header.stamp',
+      '.transforms[:]{child_frame_id==""}.header.stamp.nsec',
+      '.transforms[:]{child_frame_id==""}.header.stamp.sec',
+      '.transforms[:]{child_frame_id==""}.transform',
+      '.transforms[:]{child_frame_id==""}.transform.rotation',
+      '.transforms[:]{child_frame_id==""}.transform.translation',
+    ]);
   });
 });
 
