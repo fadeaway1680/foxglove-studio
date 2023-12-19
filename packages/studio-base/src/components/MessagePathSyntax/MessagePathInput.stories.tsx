@@ -134,6 +134,12 @@ export const AutocompleteScalarFromFullTopic: MsgPathInputStoryObj = {
   },
 };
 
+export const AutocompleteWithFilterSuggestions: MsgPathInputStoryObj = {
+  render: MessagePathInputStory,
+  args: { path: "/some_topic/st" },
+  play: clickInput,
+};
+
 export const AutocompleteMessagePath: MsgPathInputStoryObj = {
   render: MessagePathInputStory,
   args: { path: "/some_topic/location.po" },

@@ -16,6 +16,7 @@ import * as _ from "lodash-es";
 import { CSSProperties, useCallback, useMemo } from "react";
 import { makeStyles } from "tss-react/mui";
 
+import { filterMap } from "@foxglove/den/collection";
 import * as PanelAPI from "@foxglove/studio-base/PanelAPI";
 import Autocomplete, { IAutocomplete } from "@foxglove/studio-base/components/Autocomplete";
 import useGlobalVariables, {
@@ -173,10 +174,13 @@ export default React.memo<MessagePathInputBaseProps>(function MessagePathInput(
             validTypes,
             noMultiSlices,
           });
-          return allPaths.map((item) => [
-            quoteTopicNameIfNeeded(topic.name) + item.path,
-            item.terminatingStructureItem,
-          ]);
+          return filterMap(allPaths, (item) => {
+            if (item.path === "") {
+              // Plain topic items will be added via `topicNamesAutocompleteItems`
+              return undefined;
+            }
+            return [quoteTopicNameIfNeeded(topic.name) + item.path, item.terminatingStructureItem];
+          });
         }),
       ),
     [messagePathStructuresForDataype, noMultiSlices, topics, validTypes],
