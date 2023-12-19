@@ -136,7 +136,7 @@ export const AutocompleteScalarFromFullTopic: MsgPathInputStoryObj = {
 
 export const AutocompleteWithFilterSuggestions: MsgPathInputStoryObj = {
   render: MessagePathInputStory,
-  args: { path: "/some_topic/st" },
+  args: { path: "stateitems" },
   play: clickInput,
 };
 
