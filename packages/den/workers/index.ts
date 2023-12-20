@@ -35,6 +35,8 @@ export const schemeFillUp =
   (counts: number[]) =>
     counts.findIndex((v) => v < clientsPerInstance);
 
+type Multiplexer<T> = () => [instance: T, dispose: () => void];
+
 /**
  * multiplex is a simple, abstract mechanism for multiplexing a particular
  * resource. Given functions to create and destroy an instance and a
