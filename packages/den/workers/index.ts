@@ -46,7 +46,11 @@ type Multiplexer<T> = () => [instance: T, dispose: () => void];
  * This can be used to distribute N clients out to M instances of a resource.
  * In our case we use it for allocating clients to Web Workers.
  */
-export const multiplex = <T>(create: () => T, destroy: (arg0: T) => void, scheme: Scheme) => {
+export const multiplex = <T>(
+  create: () => T,
+  destroy: (arg0: T) => void,
+  scheme: Scheme,
+): Multiplexer<T> => {
   let instances: Instance<T>[] = [];
 
   /**
