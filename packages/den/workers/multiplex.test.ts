@@ -19,7 +19,7 @@ describe("multiplex", () => {
     expect(count).toEqual(0);
   });
 
-  it("creates a new instance when scheme returns index", () => {
+  it("uses an existing instance when scheme returns index", () => {
     let count = 0;
     const create = multiplex<number>(
       () => count++,
