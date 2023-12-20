@@ -67,7 +67,7 @@ export const multiplex = <T>(
    */
   const updateClients = (t: T, delta: number) => {
     instances = instances.map(([value, numClients]) =>
-      t == value ? [value, numClients + delta] : [value, numClients],
+      t === value ? [value, numClients + delta] : [value, numClients],
     );
   };
 
