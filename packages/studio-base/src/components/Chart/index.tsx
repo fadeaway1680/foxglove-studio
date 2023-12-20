@@ -18,7 +18,7 @@ import { assert } from "ts-essentials";
 import { v4 as uuidv4 } from "uuid";
 
 import { type ZoomPluginOptions } from "@foxglove/chartjs-plugin-zoom/types/options";
-import { multiplex, scheme1to1 } from "@foxglove/den/workers";
+import { multiplex, schemeFillUp } from "@foxglove/den/workers";
 import Logger from "@foxglove/log";
 import {
   InitOpts,
@@ -81,7 +81,7 @@ const createWorker = multiplex(
   ([, worker]) => {
     worker.terminate();
   },
-  scheme1to1,
+  schemeFillUp(4),
 );
 
 // turn a React.MouseEvent into an object we can send over rpc
