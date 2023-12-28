@@ -10,25 +10,20 @@ import {
   Square12Regular,
 } from "@fluentui/react-icons";
 import { ButtonBase, Checkbox, Tooltip, Typography, buttonBaseClasses } from "@mui/material";
-import { MouseEventHandler, useMemo, useState } from "react";
+import { MouseEventHandler } from "react";
 import { useTranslation } from "react-i18next";
 import { makeStyles } from "tss-react/mui";
-import { v4 as uuidv4 } from "uuid";
 
 import { Immutable } from "@foxglove/studio";
-import { iterateTyped } from "@foxglove/studio-base/components/Chart/datasets";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
 import { useSelectedPanels } from "@foxglove/studio-base/context/CurrentLayoutContext";
-import { useHoverValue } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 import { useWorkspaceActions } from "@foxglove/studio-base/context/Workspace/useWorkspaceActions";
 import { plotPathDisplayName } from "@foxglove/studio-base/panels/Plot/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
-import { PlotPath, TypedDataSet, TypedData } from "./internalTypes";
+import { PlotPath } from "./internalTypes";
 
 type PlotLegendRowProps = Immutable<{
-  currentTime?: number;
-  datasets: TypedDataSet[];
   hasMismatchedDataLength: boolean;
   index: number;
   onClickPath: () => void;
@@ -101,14 +96,6 @@ const useStyles = makeStyles<void, "plotName" | "actionButton">()((theme, _param
       whiteSpace: "nowrap",
     },
   },
-  plotValue: {
-    display: "flex",
-    alignItems: "center",
-    justifySelf: "stretch",
-    height: ROW_HEIGHT,
-    padding: theme.spacing(0.25, 1, 0.25, 0.25),
-    whiteSpace: "pre-wrap",
-  },
   errorIcon: {
     color: theme.palette.error.main,
   },
@@ -131,8 +118,6 @@ const useStyles = makeStyles<void, "plotName" | "actionButton">()((theme, _param
 }));
 
 export function PlotLegendRow({
-  currentTime,
-  datasets,
   hasMismatchedDataLength,
   index,
   onClickPath,
@@ -146,36 +131,6 @@ export function PlotLegendRow({
   const { setSelectedPanelIds } = useSelectedPanels();
   const { classes, cx } = useStyles();
   const { t } = useTranslation("plot");
-
-  const correspondingData = useMemo(() => {
-    if (!showPlotValuesInLegend) {
-      return [];
-    }
-    return datasets[index]?.data ?? [];
-  }, [datasets, index, showPlotValuesInLegend]);
-
-  const [hoverComponentId] = useState<string>(() => uuidv4());
-  const hoverValue = useHoverValue({
-    componentId: hoverComponentId,
-    disableUpdates: !showPlotValuesInLegend,
-    isPlaybackSeconds: true,
-  });
-
-  const currentValue = useMemo(() => {
-    if (!showPlotValuesInLegend) {
-      return undefined;
-    }
-    const timeToCompare = hoverValue?.value ?? currentTime;
-
-    let value;
-    for (const pt of iterateTyped(correspondingData as TypedData[])) {
-      if (timeToCompare == undefined || pt.x > timeToCompare) {
-        break;
-      }
-      value = pt.value;
-    }
-    return value?.toString();
-  }, [showPlotValuesInLegend, hoverValue?.value, currentTime, correspondingData]);
 
   // When there are no series configured we render an extra row to show an "add series" button.
   const isAddSeriesRow = paths.length === 0;
@@ -249,18 +204,6 @@ export function PlotLegendRow({
           </Tooltip>
         )}
       </div>
-      {showPlotValuesInLegend && (
-        <div className={classes.plotValue}>
-          <Typography
-            variant="body2"
-            align="right"
-            color={hoverValue?.value != undefined ? "warning.main" : "text.secondary"}
-          >
-            {currentValue && !(+currentValue < 0) && " "}
-            {currentValue ?? ""}
-          </Typography>
-        </div>
-      )}
       <div className={classes.actionButton}>
         {index === paths.length ? (
           <ButtonBase title="Add series" aria-label="Add series" onClick={onClickPath}>

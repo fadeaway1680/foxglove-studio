@@ -91,10 +91,6 @@ export function datumToTyped(data: Datum[]): TypedData {
   };
 }
 
-export function concatTyped(a: TypedData[], b: TypedData[]): TypedData[] {
-  return a.concat(...b);
-}
-
 function getDatumsForMessagePathItem(
   yItem: Immutable<PlotDataItem>,
   xItem: undefined | Immutable<PlotDataItem>,

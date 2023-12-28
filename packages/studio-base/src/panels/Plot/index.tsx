@@ -11,88 +11,40 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
-import { useTheme } from "@mui/material";
-import * as _ from "lodash-es";
-import { ComponentProps, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useDeepMemo } from "@foxglove/hooks";
-import {
-  Time,
-  add as addTimes,
-  fromSec,
-  subtract as subtractTimes,
-  toSec,
-} from "@foxglove/rostime";
-import {
-  MessagePipelineContext,
-  useMessagePipeline,
-  useMessagePipelineGetter,
-} from "@foxglove/studio-base/components/MessagePipeline";
+import { useMessagePipelineSubscribe } from "@foxglove/studio-base/components/MessagePipeline";
 import Panel from "@foxglove/studio-base/components/Panel";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
-import {
-  PanelContextMenu,
-  PanelContextMenuItem,
-} from "@foxglove/studio-base/components/PanelContextMenu";
 import PanelToolbar, {
   PANEL_TOOLBAR_MIN_HEIGHT,
 } from "@foxglove/studio-base/components/PanelToolbar";
 import Stack from "@foxglove/studio-base/components/Stack";
-import { ChartDefaultView } from "@foxglove/studio-base/components/TimeBasedChart";
-import { OnClickArg as OnChartClickArgs } from "@foxglove/studio-base/src/components/Chart";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 
-import PlotChart from "./PlotChart";
+import { ChartRenderer } from "./ChartRenderer";
 import { PlotLegend } from "./PlotLegend";
-import { downloadCSV } from "./csv";
-import { TypedDataSet } from "./internalTypes";
-import { EmptyPlotData, EmptyData } from "./plotData";
 import { usePlotPanelSettings } from "./settings";
 import { PlotConfig } from "./types";
-import useDatasets from "./useDatasets";
 
 const defaultSidebarDimension = 240;
 
-const EmptyDatasets: TypedDataSet[] = [];
+const EmptyPaths: string[] = [];
 
 type Props = {
   config: PlotConfig;
   saveConfig: SaveConfig<PlotConfig>;
 };
 
-function selectStartTime(ctx: MessagePipelineContext) {
-  return ctx.playerState.activeData?.startTime;
-}
-
-function selectCurrentTime(ctx: MessagePipelineContext) {
-  return ctx.playerState.activeData?.currentTime;
-}
-
-function selectEndTime(ctx: MessagePipelineContext) {
-  return ctx.playerState.activeData?.endTime;
-}
-
-const ZERO_TIME = Object.freeze({ sec: 0, nsec: 0 });
-
 function Plot(props: Props) {
   const { saveConfig, config } = props;
   const {
     title: legacyTitle,
-    followingViewWidth,
-    paths: yAxisPaths,
-    minXValue,
-    maxXValue,
-    minYValue,
-    maxYValue,
-    showXAxisLabels,
-    showYAxisLabels,
+    paths: series,
     showLegend,
     legendDisplay = config.showSidebar === true ? "left" : "floating",
     showPlotValuesInLegend,
-    isSynced,
-    xAxisVal,
-    xAxisPath,
     sidebarDimension = config.sidebarWidth ?? defaultSidebarDimension,
     [PANEL_TITLE_CONFIG_KEY]: customTitle,
   } = config;
@@ -134,10 +86,20 @@ function Plot(props: Props) {
     }
   }, [customTitle, legacyTitle, saveConfig]);
 
-  const startTime = useMessagePipeline(selectStartTime);
-  const currentTime = useMessagePipeline(selectCurrentTime);
-  const endTime = useMessagePipeline(selectEndTime);
+  const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
 
+  usePlotPanelSettings(config, saveConfig, focusedPath);
+
+  const stackDirection = useMemo(
+    () => (legendDisplay === "top" ? "column" : "row"),
+    [legendDisplay],
+  );
+
+  const onClickPath = useCallback((index: number) => {
+    setFocusedPath(["paths", String(index)]);
+  }, []);
+
+  /*
   // Min/max x-values and playback position indicator are only used for preloaded plots. In non-
   // preloaded plots min x-value is always the last seek time, and the max x-value is the current
   // playback time.
@@ -148,8 +110,6 @@ function Plot(props: Props) {
     return undefined;
   };
 
-  const currentTimeSinceStart = timeSincePreloadedStart(currentTime);
-
   const followingView = useMemo<ChartDefaultView | undefined>(() => {
     if (followingViewWidth != undefined && +followingViewWidth > 0) {
       return { type: "following", width: +followingViewWidth };
@@ -157,7 +117,6 @@ function Plot(props: Props) {
     return undefined;
   }, [followingViewWidth]);
 
-  const endTimeSinceStart = timeSincePreloadedStart(endTime);
   const fixedView = useMemo<ChartDefaultView | undefined>(() => {
     // Apply min/max x-value if either min or max or both is defined.
     if ((_.isNumber(minXValue) && _.isNumber(endTimeSinceStart)) || _.isNumber(maxXValue)) {
@@ -178,57 +137,6 @@ function Plot(props: Props) {
     return followingView ?? fixedView ?? undefined;
   }, [fixedView, followingView]);
 
-  const theme = useTheme();
-
-  const {
-    data: plotData,
-    provider,
-    getFullData,
-  } = useDatasets({
-    startTime: startTime ?? ZERO_TIME,
-    paths: yAxisPaths,
-    invertedTheme: theme.palette.mode === "dark",
-    xAxisPath,
-    xAxisVal,
-    minXValue,
-    maxXValue,
-    minYValue,
-    maxYValue,
-    followingViewWidth,
-  });
-
-  const {
-    datasets,
-    bounds: datasetBounds,
-    pathsWithMismatchedDataLengths,
-  } = useMemo(() => {
-    const data = plotData ?? EmptyPlotData;
-    return {
-      bounds: data.bounds,
-      pathsWithMismatchedDataLengths: data.pathsWithMismatchedDataLengths,
-      // Return a dataset for all paths here so that the ordering of datasets corresponds
-      // to yAxisPaths as expected by downstream components like the legend.
-      //
-      // Label is needed so that TimeBasedChart doesn't discard the empty dataset and mess
-      // up the ordering.
-      datasets: yAxisPaths.map((path) => {
-        for (const [otherPath, dataset] of data.datasets.entries()) {
-          if (
-            otherPath.value === path.value &&
-            otherPath.timestampMethod === path.timestampMethod
-          ) {
-            return dataset;
-          }
-        }
-        return { label: path.label ?? path.value, data: [EmptyData] };
-      }),
-    };
-  }, [plotData, yAxisPaths]);
-
-  // We use a deep memo here as React's default equality check Object.is() returns false for
-  // two empty lists which causes unnecessary re-rendering of the PlotLegend component.
-  const memoizedPathsWithMismatchedDataLengths = useDeepMemo(pathsWithMismatchedDataLengths);
-
   const messagePipeline = useMessagePipelineGetter();
   const onClick = useCallback<NonNullable<ComponentProps<typeof PlotChart>["onClick"]>>(
     ({ x: seekSeconds }: OnChartClickArgs) => {
@@ -247,14 +155,6 @@ function Plot(props: Props) {
     [messagePipeline, xAxisVal],
   );
 
-  const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
-
-  usePlotPanelSettings(config, saveConfig, focusedPath);
-
-  const stackDirection = useMemo(
-    () => (legendDisplay === "top" ? "column" : "row"),
-    [legendDisplay],
-  );
 
   const getPanelContextMenuItems = useCallback(() => {
     const items: PanelContextMenuItem[] = [
@@ -277,10 +177,39 @@ function Plot(props: Props) {
     ];
     return items;
   }, [getFullData, xAxisVal]);
+*/
 
-  const onClickPath = useCallback((index: number) => {
-    setFocusedPath(["paths", String(index)]);
-  }, []);
+  const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
+  const [chartRenderer, setChartRender] = useState<ChartRenderer | undefined>(undefined);
+
+  const subscribeMessasagePipeline = useMessagePipelineSubscribe();
+
+  useEffect(() => {
+    if (!canvasDiv) {
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "100%";
+    canvasDiv.appendChild(canvas);
+
+    const renderer = new ChartRenderer(canvas);
+    setChartRender(renderer);
+    const unsub = subscribeMessasagePipeline(renderer.update.bind(renderer));
+
+    return () => {
+      unsub();
+      renderer.terminate();
+      canvasDiv.removeChild(canvasDiv);
+    };
+  }, [canvasDiv, subscribeMessasagePipeline]);
+
+  // subscribe?
+  // why do it in the chart stuff and not here?
+  // we can also compute the message path functions here?
+
+  useEffect(() => {
+    chartRenderer?.updateConfig(config);
+  }, [chartRenderer, config]);
 
   return (
     <Stack
@@ -301,12 +230,10 @@ function Plot(props: Props) {
         {/* Pass stable values here for properties when not showing values so that the legend memoization remains stable. */}
         {legendDisplay !== "none" && (
           <PlotLegend
-            currentTime={showPlotValuesInLegend ? currentTimeSinceStart : undefined}
-            datasets={showPlotValuesInLegend ? datasets : EmptyDatasets}
             legendDisplay={legendDisplay}
             onClickPath={onClickPath}
-            paths={yAxisPaths}
-            pathsWithMismatchedDataLengths={memoizedPathsWithMismatchedDataLengths}
+            paths={series}
+            pathsWithMismatchedDataLengths={EmptyPaths /* fixme */}
             saveConfig={saveConfig}
             showLegend={showLegend}
             showPlotValuesInLegend={showPlotValuesInLegend}
@@ -314,21 +241,7 @@ function Plot(props: Props) {
           />
         )}
         <Stack flex="auto" alignItems="center" justifyContent="center" overflow="hidden">
-          <PlotChart
-            currentTime={currentTimeSinceStart}
-            datasetBounds={datasetBounds}
-            provider={provider}
-            defaultView={defaultView}
-            isSynced={xAxisVal === "timestamp" && isSynced}
-            maxYValue={parseFloat((maxYValue ?? "").toString())}
-            minYValue={parseFloat((minYValue ?? "").toString())}
-            onClick={onClick}
-            paths={yAxisPaths}
-            showXAxisLabels={showXAxisLabels}
-            showYAxisLabels={showYAxisLabels}
-            xAxisVal={xAxisVal}
-          />
-          <PanelContextMenu getItems={getPanelContextMenuItems} />
+          <div ref={setCanvasDiv} />
         </Stack>
       </Stack>
     </Stack>

@@ -22,15 +22,12 @@ import { PlotPath } from "@foxglove/studio-base/panels/Plot/internalTypes";
 import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 
-import { TypedDataSet } from "./internalTypes";
 import { DEFAULT_PATH } from "./settings";
 
 const minLegendWidth = 25;
 const maxLegendWidth = 800;
 
 type Props = Immutable<{
-  currentTime?: number;
-  datasets: TypedDataSet[];
   legendDisplay: "floating" | "top" | "left";
   onClickPath: (index: number) => void;
   paths: PlotPath[];
@@ -145,8 +142,6 @@ const useStyles = makeStyles<void, "grid" | "toggleButton" | "toggleButtonFloati
 
 function PlotLegendComponent(props: Props): JSX.Element {
   const {
-    currentTime,
-    datasets,
     legendDisplay,
     onClickPath,
     paths,
@@ -240,8 +235,6 @@ function PlotLegendComponent(props: Props): JSX.Element {
         >
           {(paths.length === 0 ? [DEFAULT_PATH] : paths).map((path, index) => (
             <PlotLegendRow
-              currentTime={currentTime}
-              datasets={datasets}
               hasMismatchedDataLength={pathsWithMismatchedDataLengths.includes(path.value)}
               index={index}
               key={index}
