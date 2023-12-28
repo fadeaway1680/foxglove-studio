@@ -12,18 +12,26 @@
 //   You may not use this file except in compliance with the License.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
-import { useMessagePipelineSubscribe } from "@foxglove/studio-base/components/MessagePipeline";
+import { filterMap } from "@foxglove/den/collection";
+import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
+import {
+  MessagePipelineContext,
+  useMessagePipeline,
+  useMessagePipelineSubscribe,
+} from "@foxglove/studio-base/components/MessagePipeline";
 import Panel from "@foxglove/studio-base/components/Panel";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
 import PanelToolbar, {
   PANEL_TOOLBAR_MIN_HEIGHT,
 } from "@foxglove/studio-base/components/PanelToolbar";
 import Stack from "@foxglove/studio-base/components/Stack";
+import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 
-import { ChartRenderer } from "./ChartRenderer";
+import { ChartRenderer } from "./OffscreenCanvasRenderer";
 import { PlotLegend } from "./PlotLegend";
 import { usePlotPanelSettings } from "./settings";
 import { PlotConfig } from "./types";
@@ -179,9 +187,17 @@ function Plot(props: Props) {
   }, [getFullData, xAxisVal]);
 */
 
+  const [subscriberId] = useState(() => uuidv4());
   const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
   const [chartRenderer, setChartRender] = useState<ChartRenderer | undefined>(undefined);
 
+  const setSubscriptions = useMessagePipeline(
+    useCallback(
+      ({ setSubscriptions: pipelineSetSubscriptions }: MessagePipelineContext) =>
+        pipelineSetSubscriptions,
+      [],
+    ),
+  );
   const subscribeMessasagePipeline = useMessagePipelineSubscribe();
 
   useEffect(() => {
@@ -192,9 +208,14 @@ function Plot(props: Props) {
     canvas.style.width = "100%";
     canvasDiv.appendChild(canvas);
 
-    const renderer = new ChartRenderer(canvas);
+    if (typeof canvas.transferControlToOffscreen !== "function") {
+      throw new Error("Offscreen rendering is not supported");
+    }
+
+    const offscreenCanvas = canvas.transferControlToOffscreen();
+    const renderer = new ChartRenderer(offscreenCanvas);
     setChartRender(renderer);
-    const unsub = subscribeMessasagePipeline(renderer.update.bind(renderer));
+    const unsub = subscribeMessasagePipeline(renderer.handleMessagePipelineState.bind(renderer));
 
     return () => {
       unsub();
@@ -203,12 +224,30 @@ function Plot(props: Props) {
     };
   }, [canvasDiv, subscribeMessasagePipeline]);
 
+  // We could subscribe in the chart renderer, but doing it with react effects is easier for
+  // managing the lifecycle of the subscriptions. The renderer will correlate input message data to
+  // the correct series.
+  useEffect(() => {
+    // fixme - xAxisPath
+    // fixme - slices?
+
+    const subscriptions = filterMap(series, (item): SubscribePayload | undefined => {
+      const parsed = parseRosPath(item.value);
+      if (!parsed) {
+        return;
+      }
+
+      return { topic: parsed.topicName, preloadType: "full" };
+    });
+    setSubscriptions(subscriberId, subscriptions);
+  }, [series, setSubscriptions, subscriberId]);
+
   // subscribe?
   // why do it in the chart stuff and not here?
   // we can also compute the message path functions here?
 
   useEffect(() => {
-    chartRenderer?.updateConfig(config);
+    chartRenderer?.handleConfig(config);
   }, [chartRenderer, config]);
 
   return (

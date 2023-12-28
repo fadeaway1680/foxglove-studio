@@ -7,11 +7,14 @@ import * as Comlink from "comlink";
 import { Immutable } from "@foxglove/studio";
 import { MessagePipelineContext } from "@foxglove/studio-base/components/MessagePipeline";
 
+import type { Service } from "./OffscreenCanvasRenderer.worker";
+
 export class ChartRenderer {
   #worker: Worker;
-  //#remote: Comlink.Remote<(typeof import("./WorkerImageDecoder.worker"))["service"]>;
+  #canvas: OffscreenCanvas;
+  #remote: Comlink.Remote<Service>;
 
-  public constructor(canvas: HTMLCanvasElement) {
+  public constructor(canvas: OffscreenCanvas) {
     /*
     const offscreenCanvas =
       typeof canvas.transferControlToOffscreen === "function"

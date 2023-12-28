@@ -11,16 +11,10 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
-import { ChartDataset } from "chart.js";
-
 import { Time } from "@foxglove/rostime";
-import { Immutable } from "@foxglove/studio";
-import type { TypedData as OriginalTypedData } from "@foxglove/studio-base/components/Chart/types";
-import { MessagePathStructureItemMessage } from "@foxglove/studio-base/components/MessagePathSyntax/constants";
 import { MessagePathDataItem } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import type { ChartDatum } from "@foxglove/studio-base/components/TimeBasedChart/types";
-import { Topic, MessageEvent } from "@foxglove/studio-base/players/types";
-import { RosDatatypes } from "@foxglove/studio-base/types/RosDatatypes";
+import { MessageEvent } from "@foxglove/studio-base/players/types";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
 export type Messages = Record<string, MessageEvent[]>;
@@ -53,18 +47,6 @@ export type Datum = ChartDatum & {
   headerStamp?: Time;
 };
 
-export type DataSet = ChartDataset<"scatter", Datum[]>;
-
-export type TypedData = OriginalTypedData & {
-  receiveTime: Time[];
-  headerStamp?: Time[];
-};
-export type TypedDataSet = ChartDataset<"scatter", TypedData[]>;
-
-// Key datasets by the full PlotPath instead of just the string value because we need to
-// generate a new dataset if the plot path is ordered by headerStamp.
-export type DatasetsByPath = Map<PlotPath, TypedDataSet>;
-
 export type PlotDataItem = {
   queriedData: MessagePathDataItem[];
   receiveTime: Time;
@@ -75,16 +57,6 @@ export type PlotDataItem = {
 export function isReferenceLinePlotPathType(path: BasePlotPath): boolean {
   return !isNaN(Number.parseFloat(path.value));
 }
-
-export type Metadata = Immutable<{
-  topics: Topic[];
-  datatypes: RosDatatypes;
-}>;
-
-export type MetadataEnums = Metadata & {
-  enumValues: { [datatype: string]: { [field: string]: { [value: string]: string } } };
-  structures: Record<string, MessagePathStructureItemMessage>;
-};
 
 export type PlotParams = {
   startTime: Time;
