@@ -53,11 +53,6 @@ export type PlotDataItem = {
   headerStamp?: Time;
 };
 
-// A "reference line" plot path is a numeric value. It creates a horizontal line on the plot at the specified value.
-export function isReferenceLinePlotPathType(path: BasePlotPath): boolean {
-  return !isNaN(Number.parseFloat(path.value));
-}
-
 export type PlotParams = {
   startTime: Time;
   paths: readonly PlotPath[];

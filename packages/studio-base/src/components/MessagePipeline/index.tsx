@@ -72,11 +72,14 @@ export function useMessagePipelineSubscribe(): (
 ) => () => void {
   const store = useGuaranteedContext(ContextInternal);
 
-  return (fn: (state: MessagePipelineContext) => void) => {
-    return store.subscribe((state) => {
-      fn(state.public);
-    });
-  };
+  return useCallback(
+    (fn: (state: MessagePipelineContext) => void) => {
+      return store.subscribe((state) => {
+        fn(state.public);
+      });
+    },
+    [store],
+  );
 }
 
 type ProviderProps = {

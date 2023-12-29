@@ -16,7 +16,6 @@ import { screen, userEvent, waitFor } from "@storybook/testing-library";
 import { produce } from "immer";
 import * as _ from "lodash-es";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAsync } from "react-use";
 import { makeStyles } from "tss-react/mui";
 
 import { fromSec } from "@foxglove/rostime";
@@ -248,7 +247,7 @@ const messageCache: BlockCache = {
   startTime: fromSec(0.6),
 };
 
-export const fixture: Fixture = {
+const fixture: Fixture = {
   datatypes,
   topics: [
     { name: "/some_topic/location", schemaName: "msgs/PoseDebug" },
@@ -322,7 +321,7 @@ export const fixture: Fixture = {
   progress: { messageCache },
 };
 
-export const paths: PlotConfig["paths"] = [
+const paths: PlotConfig["paths"] = [
   { value: "/some_topic/location.pose.velocity", enabled: true, timestampMethod: "receiveTime" },
   {
     value: "/some_topic/location.pose.acceleration",
@@ -351,23 +350,6 @@ const exampleConfig: PlotConfig = {
   sidebarDimension: 0,
 };
 
-function useDelayedFixture(customFixture?: Fixture) {
-  // HACK: when the fixture was provided immediately on first render, we encountered an ordering
-  // issue where useProvider/useDatasets would process block messages before the chart was
-  // registered, thus `evictCache()` would clear out all the data (since no topics were registered
-  // yet).
-  const finalFixture = customFixture ?? fixture;
-  const { value: delayedFixture } = useAsync(async () => {
-    // another tick is needed to allow the useDatasets worker to process metadata & registrations
-    // before messages are delivered
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    return finalFixture;
-  }, [finalFixture]);
-
-  // Topics and datatypes need to be present before messages are received for plots to render
-  return delayedFixture ?? { topics: finalFixture.topics, datatypes: finalFixture.datatypes };
-}
-
 function PlotWrapper(props: {
   style?: { [key: string]: string | number };
   includeSettings?: boolean;
@@ -375,10 +357,17 @@ function PlotWrapper(props: {
   pauseFrame: (_arg: string) => () => void;
   config: PlotConfig;
 }): JSX.Element {
-  const delayedFixture = useDelayedFixture(props.fixture);
+  const [actualFixture, setFixture] = useState<Fixture | undefined>();
+
+  useEffect(() => {
+    setTimeout(() => {
+      setFixture(props.fixture ?? fixture);
+    }, 0);
+  }, [props.fixture]);
+
   return (
     <PanelSetup
-      fixture={delayedFixture}
+      fixture={actualFixture}
       pauseFrame={props.pauseFrame}
       includeSettings={props.includeSettings}
       style={{ ...props.style }}
@@ -388,6 +377,7 @@ function PlotWrapper(props: {
   );
 }
 
+// fixme - delete
 function useDebouncedReadySignal(): ReadySignal {
   const readySignal = useReadySignal();
   return React.useMemo(() => {
