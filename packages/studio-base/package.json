@@ -58,7 +58,7 @@
     "@svgr/webpack": "8.1.0",
     "@tanstack/react-table": "8.10.3",
     "@testing-library/react": "14.0.0",
-    "@types/base16": "^1.0.3",
+    "@types/base16": "^1.0.5",
     "@types/cytoscape": "^3.19.11",
     "@types/foxglove__roslibjs": "workspace:*",
     "@types/foxglove__web": "workspace:*",
