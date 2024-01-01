@@ -2600,7 +2600,7 @@ __metadata:
     geojson: 0.5.0
     gl-matrix: 3.4.3
     hammerjs: 2.0.8
-    i18next: 23.5.1
+    i18next: 23.7.13
     i18next-browser-languagedetector: 7.1.0
     idb-keyval: 6.2.1
     immer: 10.0.2
@@ -12614,12 +12614,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"i18next@npm:23.5.1":
-  version: 23.5.1
-  resolution: "i18next@npm:23.5.1"
+"i18next@npm:23.7.13":
+  version: 23.7.13
+  resolution: "i18next@npm:23.7.13"
   dependencies:
-    "@babel/runtime": ^7.22.5
-  checksum: 4be043bd72287bfae9777a3252b9458d2e3f5e9a97ea62cf434e6e3767b45df4365d8780d0dd14efd4e9da5eb0f90534510b138f1372d1cb9012000a69bbedaf
+    "@babel/runtime": ^7.23.2
+  checksum: 58d188979d04d23547abcbceb20299df379c82e69d1a5387051668a05db92480a8ff98b1d12c4e3501ee6566e533873738dac2042db193e810bc6f8bc505368e
   languageName: node
   linkType: hard
 
