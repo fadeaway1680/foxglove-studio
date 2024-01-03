@@ -13,9 +13,10 @@
 
 import {
   Delete20Regular,
+  SplitHorizontal20Regular,
+  SplitVertical20Regular,
   TabDesktop20Regular,
   TabDesktopMultiple20Regular,
-  TableSimple20Regular,
 } from "@fluentui/react-icons";
 import * as _ from "lodash-es";
 import React, {
@@ -29,10 +30,12 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getNodeAtPath,
   getOtherBranch,
   MosaicContext,
+  MosaicDirection,
   MosaicNode,
   MosaicWindowActions,
   MosaicWindowContext,
@@ -130,6 +133,7 @@ export default function Panel<
     const { childId = FALLBACK_PANEL_ID, overrideConfig, tabId, ...otherProps } = props;
     const { classes, cx, theme } = useStyles();
     const isMounted = useMountedState();
+    const { t } = useTranslation("panelToolbar");
 
     const { mosaicActions } = useContext(MosaicContext);
     const { mosaicWindowActions }: { mosaicWindowActions: MosaicWindowActions } =
@@ -361,43 +365,47 @@ export default function Panel<
       });
     }, [closePanel, mosaicActions, mosaicWindowActions, tabId]);
 
-    const splitPanel = useCallback(() => {
-      const savedProps = getCurrentLayoutState().selectedLayout?.data?.configById;
-      if (!savedProps) {
-        return;
-      }
-      const tabSavedProps = tabId != undefined ? (savedProps[tabId] as TabPanelConfig) : undefined;
-      if (tabId != undefined && tabSavedProps != undefined) {
-        const newId = getPanelIdForType(PanelComponent.panelType);
-        const activeTabLayout = tabSavedProps.tabs[tabSavedProps.activeTabIdx]?.layout;
-        if (activeTabLayout == undefined) {
+    const splitPanel = useCallback(
+      (direction: MosaicDirection) => {
+        const savedProps = getCurrentLayoutState().selectedLayout?.data?.configById;
+        if (!savedProps) {
           return;
         }
-        const pathToPanelInTab = getPathFromNode(childId, activeTabLayout);
-        const newTabLayout = updateTree(activeTabLayout, [
-          {
-            path: pathToPanelInTab,
-            spec: { $set: { first: childId, second: newId, direction: "row" } },
-          },
-        ]);
-        const newTabConfig = updateTabPanelLayout(newTabLayout, tabSavedProps);
-        savePanelConfigs({
-          configs: [
-            { id: tabId, config: newTabConfig },
-            { id: newId, config: panelComponentConfig },
-          ],
-        });
-      } else {
-        void mosaicWindowActions.split({ type: PanelComponent.panelType });
-      }
-    }, [
-      childId,
-      getCurrentLayoutState,
-      mosaicWindowActions,
-      panelComponentConfig,
-      savePanelConfigs,
-      tabId,
-    ]);
+        const tabSavedProps =
+          tabId != undefined ? (savedProps[tabId] as TabPanelConfig) : undefined;
+        if (tabId != undefined && tabSavedProps != undefined) {
+          const newId = getPanelIdForType(PanelComponent.panelType);
+          const activeTabLayout = tabSavedProps.tabs[tabSavedProps.activeTabIdx]?.layout;
+          if (activeTabLayout == undefined) {
+            return;
+          }
+          const pathToPanelInTab = getPathFromNode(childId, activeTabLayout);
+          const newTabLayout = updateTree(activeTabLayout, [
+            {
+              path: pathToPanelInTab,
+              spec: { $set: { first: childId, second: newId, direction } },
+            },
+          ]);
+          const newTabConfig = updateTabPanelLayout(newTabLayout, tabSavedProps);
+          savePanelConfigs({
+            configs: [
+              { id: tabId, config: newTabConfig },
+              { id: newId, config: panelComponentConfig },
+            ],
+          });
+        } else {
+          void mosaicWindowActions.split({ type: PanelComponent.panelType });
+        }
+      },
+      [
+        childId,
+        getCurrentLayoutState,
+        mosaicWindowActions,
+        panelComponentConfig,
+        savePanelConfigs,
+        tabId,
+      ],
+    );
 
     const { enterFullscreen, exitFullscreen } = useMemo(
       () => ({
@@ -560,14 +568,24 @@ export default function Panel<
       if (quickActionsKeyPressed) {
         overlayProps.actions = [
           {
-            key: "split",
-            text: "Split panel",
-            icon: <TableSimple20Regular />,
-            onClick: splitPanel,
+            key: "vsplit",
+            text: t("splitRight"),
+            icon: <SplitVertical20Regular />,
+            onClick: () => {
+              splitPanel("row");
+            },
+          },
+          {
+            key: "hsplit",
+            text: t("splitDown"),
+            icon: <SplitHorizontal20Regular />,
+            onClick: () => {
+              splitPanel("column");
+            },
           },
           {
             key: "remove",
-            text: "Remove panel",
+            text: "Remove",
             icon: <Delete20Regular />,
             color: "error",
             onClick: removePanel,
@@ -589,6 +607,7 @@ export default function Panel<
       removePanel,
       setSelectedPanelIds,
       splitPanel,
+      t,
       type,
     ]);
 
