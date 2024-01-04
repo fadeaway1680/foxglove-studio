@@ -525,7 +525,7 @@ export function Plot(props: Props): JSX.Element {
 
   const onResetView = useCallback(() => {
     setShowReset(false);
-    chartRenderer?.setTimeseriesBounds({ min: undefined, max: undefined });
+    chartRenderer?.resetBounds();
 
     if (shouldSync) {
       setGlobalBounds(undefined);

@@ -199,6 +199,31 @@ export class ChartRenderer {
     this.#chartInstance = chartInstance;
   }
 
+  public resetBounds(): void {
+    {
+      const scale = this.#chartInstance.options.scales?.x;
+      if (scale) {
+        scale.min = undefined;
+        scale.max = undefined;
+      }
+    }
+
+    {
+      const scale = this.#chartInstance.options.scales?.y;
+      if (scale) {
+        scale.min = undefined;
+        scale.max = undefined;
+      }
+    }
+
+    // While the chartjs API doesn't indicate update should be called after resize, in practice
+    // we've found that performing a resize after an update sometimes results in a blank chart.
+    //
+    // NOTE: "none" disables animations - this is important for chart performance because we update
+    // the entire data set which does not preserve history for the chart animations
+    this.#chartInstance.update("none");
+  }
+
   /**
    * Apply the array of interaction events and return the new min/max for the x-axis.
    *

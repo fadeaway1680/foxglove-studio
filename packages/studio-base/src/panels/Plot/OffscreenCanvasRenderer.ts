@@ -84,7 +84,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
 
   #viewport: Viewport = {
     size: { width: 0, height: 0 },
-    bounds: { x: { min: 0, max: 0 }, y: { min: 0, max: 0 } },
+    bounds: { x: undefined, y: undefined },
   };
 
   #queueDispatchRender = debouncePromise(async () => {
@@ -266,6 +266,14 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       min: bounds.min ?? this.#baseRange.min,
       max: bounds.max ?? this.#baseRange.max,
     };
+    this.#queueDispatchRender();
+  }
+
+  public resetBounds(): void {
+    this.#timeseriesBounds = undefined;
+    this.#pendingRange = this.#baseRange;
+    this.#viewport.bounds.x = undefined;
+    this.#viewport.bounds.y = undefined;
     this.#queueDispatchRender();
   }
 
