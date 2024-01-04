@@ -4,7 +4,6 @@
 
 import { Button, Tooltip, Fade, buttonClasses } from "@mui/material";
 import Hammer from "hammerjs";
-import * as R from "ramda";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { makeStyles } from "tss-react/mui";
 import { v4 as uuidv4 } from "uuid";
@@ -12,10 +11,6 @@ import { v4 as uuidv4 } from "uuid";
 import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
 import { Immutable } from "@foxglove/studio";
-import {
-  MessagePathPart,
-  RosPath,
-} from "@foxglove/studio-base/components/MessagePathSyntax/constants";
 import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import {
@@ -44,6 +39,7 @@ import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
 import { PlotLegend } from "./PlotLegend";
 import { usePlotPanelSettings } from "./settings";
+import { pathToPayload } from "./subscription";
 import { PlotConfig } from "./types";
 
 export const defaultSidebarDimension = 240;
@@ -79,42 +75,6 @@ type Props = {
 
 const selectGlobalBounds = (store: TimelineInteractionStateStore) => store.globalBounds;
 const selectSetGlobalBounds = (store: TimelineInteractionStateStore) => store.setGlobalBounds;
-
-// fixme - separate file
-// fixme - get rid of ramda
-function pathToPayload(path: RosPath): SubscribePayload | undefined {
-  const { messagePath: parts, topicName: topic } = path;
-
-  // We want to take _all_ of the filters that start the path, since these can
-  // be chained
-  const filters = R.takeWhile((part: MessagePathPart) => part.type === "filter", parts);
-  const firstField = parts.find((part: MessagePathPart) => part.type === "name");
-  if (firstField == undefined || firstField.type !== "name") {
-    return undefined;
-  }
-
-  return {
-    topic,
-    preloadType: "full",
-    fields: R.pipe(
-      R.chain((part: MessagePathPart): string[] => {
-        if (part.type !== "filter") {
-          return [];
-        }
-        const { path: filterPath } = part;
-        const field = filterPath[0];
-        if (field == undefined) {
-          return [];
-        }
-
-        return [field];
-      }),
-      // Always subscribe to the header field
-      (filterFields) => [...filterFields, firstField.name, "header"],
-      R.uniq,
-    )(filters),
-  };
-}
 
 export function Plot(props: Props): JSX.Element {
   const { saveConfig, config } = props;
