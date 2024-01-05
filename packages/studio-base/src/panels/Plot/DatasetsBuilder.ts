@@ -2,21 +2,19 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { toSec } from "@foxglove/rostime";
-import { Immutable, Time } from "@foxglove/studio";
-import { downsampleTimeseries } from "@foxglove/studio-base/components/TimeBasedChart/downsample";
+import { Immutable } from "@foxglove/studio";
+import {
+  MAX_POINTS,
+  downsampleTimeseries,
+} from "@foxglove/studio-base/components/TimeBasedChart/downsample";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
-import { Dataset, DatumMetadata } from "./ChartRenderer";
-
-export type DataItem = DatumMetadata & {
-  sinceStart: Time;
-  receiveTime: Time;
-  headerStamp?: Time;
-};
+import type { Dataset, Datum } from "./ChartRenderer";
 
 type Size = { width: number; height: number };
+
+export type DataItem = Datum;
 
 export type Viewport = {
   // The numeric bounds of the viewport. When x or y are undefined, that axis is not bounded
@@ -38,11 +36,8 @@ type SeriesConfig = {
   enabled: boolean;
 };
 
-type FullDatum = DataItem & {
+type FullDatum = Datum & {
   index: number;
-  x: number;
-  y: number;
-  label: string | undefined;
 };
 
 type Series = {
@@ -79,6 +74,8 @@ export type UpdateDataAction =
   | UpdateSeriesCurrentAction
   | UpdateSeriesFullAction;
 
+const MAX_CURRENT_DATUMS = 50_000;
+
 export class DatasetsBuilder {
   #seriesByMessagePath = new Map<string, Series>();
 
@@ -94,7 +91,6 @@ export class DatasetsBuilder {
 
     for (const config of seriesConfig) {
       let existingSeries = this.#seriesByMessagePath.get(config.messagePath);
-      // fixme - key good for this? rename key to hash or identifier
       if (!existingSeries || existingSeries.config.key !== config.key) {
         existingSeries = {
           config,
@@ -116,47 +112,28 @@ export class DatasetsBuilder {
     // msg path (accumulated) - x values are items from all the messages
 
     const datasets: Dataset[] = [];
+    const numSeries = this.#seriesByMessagePath.size;
     for (const series of this.#seriesByMessagePath.values()) {
       if (!series.config.enabled) {
         continue;
       }
 
-      // fixme
       const dataset: Dataset = {
         borderColor: series.config.color,
         showLine: true,
         fill: false,
         borderWidth: series.config.lineSize,
-        pointRadius: series.config.lineSize,
+        pointRadius: series.config.lineSize * 1.2,
         pointHoverRadius: 3,
         pointBackgroundColor: series.config.color,
-        // fixme
-        //pointBackgroundColor: invertedTheme ? lightColor(borderColor) : darkColor(borderColor),
         pointBorderColor: "transparent",
         data: [],
       };
 
+      // Copy so we can set the .index property for downsampling
+      // If downsampling aglos change to not need the .index then we can get rid of some copies
       const allData = series.full.slice();
-
-      // add only the current data that is not already present in full
-      const lastX = allData[allData.length]?.x;
-      if (lastX != undefined) {
-        let idx = 0;
-        for (const item of series.current) {
-          if (item.x > lastX) {
-            break;
-          }
-          idx += 1;
-        }
-
-        // fixme - can do this before ever sending current data
-        if (idx > 0) {
-          series.current.splice(0, idx - 1);
-          if (series.current.length > 0) {
-            allData.push(...series.current);
-          }
-        }
-      } else {
+      if (series.current.length > 0) {
         allData.push(...series.current);
       }
 
@@ -166,6 +143,7 @@ export class DatasetsBuilder {
       const xBounds: Bounds1D = { min: 0, max: 0 };
       const yBounds: Bounds1D = { min: 0, max: 0 };
 
+      // trim the dataset down to the
       for (let i = 0; i < allData.length; ++i) {
         const item = allData[i]!;
         item.index = i;
@@ -189,15 +167,19 @@ export class DatasetsBuilder {
 
       const items = allData.slice(startIdx, endIdx + 1);
 
-      // fixme - max points argument
-      const downsampledIndicies = downsampleTimeseries(items, {
-        width: viewport.size.width,
-        height: viewport.size.height,
-        bounds: {
-          x: viewport.bounds.x ?? xBounds,
-          y: viewport.bounds.y ?? yBounds,
+      const maxPoints = MAX_POINTS / numSeries;
+      const downsampledIndicies = downsampleTimeseries(
+        items,
+        {
+          width: viewport.size.width,
+          height: viewport.size.height,
+          bounds: {
+            x: viewport.bounds.x ?? xBounds,
+            y: viewport.bounds.y ?? yBounds,
+          },
         },
-      });
+        maxPoints,
+      );
 
       // When a series is downsampled the points are disabled as a visual indicator that
       // data is downsampled.
@@ -247,19 +229,26 @@ export class DatasetsBuilder {
           return;
         }
 
+        // trim current data to remove values present in the full data
+        const lastX = series.full[series.full.length - 1]?.x;
+
+        // Limit the total current datums for any series so they do not grow indefinitely
+        const cullSize = Math.max(
+          0,
+          series.current.length + action.items.length - MAX_CURRENT_DATUMS,
+        );
+        series.current.splice(0, cullSize);
+
         for (const item of action.items) {
-          // fixme - how can value be undefined?
-          if (item.value == undefined) {
-            return;
+          if (lastX != undefined && item.x <= lastX) {
+            continue;
           }
 
           const idx = series.current.length;
           series.current.push({
             index: idx,
-            x: toSec(item.sinceStart),
-            y: Number(item.value),
-            label: undefined,
-            ...item,
+            x: item.x,
+            y: item.y,
           });
         }
         break;
@@ -271,21 +260,29 @@ export class DatasetsBuilder {
         }
 
         for (const item of action.items) {
-          // fixme - how can value be undefined?
-          if (item.value == undefined) {
-            return;
-          }
-
           const idx = series.full.length;
           series.full.push({
             index: idx,
-            x: toSec(item.sinceStart),
-            y: Number(item.value),
-            label: undefined,
-            ...item,
+            x: item.x,
+            y: item.y,
           });
         }
-        break;
+
+        // trim current data to remove values present in the full data
+        const lastX = series.full[series.full.length - 1]?.x;
+        if (lastX != undefined) {
+          let idx = 0;
+          for (const item of series.current) {
+            if (item.x > lastX) {
+              break;
+            }
+            idx += 1;
+          }
+
+          if (idx > 0) {
+            series.current.splice(0, idx);
+          }
+        }
       }
     }
   }

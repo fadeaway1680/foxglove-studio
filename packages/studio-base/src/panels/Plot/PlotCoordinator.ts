@@ -451,10 +451,10 @@ function readMessagePathItems(
       // fixme - extract if using header stamp for path and available
       // headerStamp: message.headerStamp,
 
+      const xValue = toSec(subtractTime(message.receiveTime, startTime));
       out.push({
-        sinceStart: subtractTime(message.receiveTime, startTime),
-        receiveTime: message.receiveTime,
-        value: chartValue,
+        x: xValue,
+        y: chartValue,
       });
     }
   }
@@ -462,18 +462,22 @@ function readMessagePathItems(
   return out;
 }
 
-function isPrimitive(value: unknown): value is string | bigint | number | boolean | undefined {
-  const type = typeof value;
-  return type === "string" || type === "bigint" || type === "number" || type === "boolean";
-}
-
-function getChartValue(value: unknown): string | bigint | number | boolean | undefined {
-  if (!isPrimitive(value)) {
-    if (isTime(value)) {
-      return toSec(value);
-    }
-    return undefined;
+function getChartValue(value: unknown): number | undefined {
+  switch (typeof value) {
+    case "bigint":
+      return Number(value);
+    case "boolean":
+      return Number(value);
+    case "number":
+      return value;
+    case "object":
+      if (isTime(value)) {
+        return toSec(value);
+      }
+      return undefined;
+    case "string":
+      return +value;
+    default:
+      return undefined;
   }
-
-  return value;
 }

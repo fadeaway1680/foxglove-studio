@@ -7,7 +7,7 @@ import * as R from "ramda";
 
 import { TypedData, ObjectData } from "./types";
 
-export type Point = { index: number; x: number; y: number; label: string | undefined };
+export type Point = { index: number; x: number; y: number; label?: string | undefined };
 
 const sumTypedDataLength = (prev: number, arr: TypedData) => prev + arr.x.length;
 

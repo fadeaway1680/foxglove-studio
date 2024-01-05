@@ -328,14 +328,9 @@ export function Plot(props: Props): JSX.Element {
       const tooltipItems: TimeBasedChartTooltipData[] = [];
 
       for (const element of elements) {
-        const value = element.data?.value;
-        if (value == undefined) {
-          continue;
-        }
-
         tooltipItems.push({
           datasetIndex: element.datasetIndex,
-          value,
+          value: element.data.y,
         });
       }
 

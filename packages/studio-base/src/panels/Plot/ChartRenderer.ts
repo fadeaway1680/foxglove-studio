@@ -44,16 +44,10 @@ export type InteractionEvent =
   | PanMoveInteractionEvent
   | PanEndInteractionEvent;
 
-/** Additional properties on the datatpoints we pass to chart */
-export type DatumMetadata = {
-  // fixme - remove? why optional?
-  // value is the original value (rather than the plot x/y value) for the datum
-  value?: string | number | bigint | boolean;
-};
-
-export type Datum = ScatterDataPoint & DatumMetadata;
-
+export type Datum = ScatterDataPoint;
 export type Dataset = ChartDataset<"scatter", Datum[]>;
+
+type ChartType = Chart<"scatter", Datum[]>;
 
 type Bounds = {
   x: Bounds1D;
@@ -61,12 +55,8 @@ type Bounds = {
 };
 
 export type HoverElement = {
-  data?: Datum;
+  data: Datum;
   datasetIndex: number;
-  view: {
-    x: number;
-    y: number;
-  };
 };
 
 type UpdateSizeAction = {
@@ -144,7 +134,7 @@ type ZoomableChart = Chart & {
 };
 
 export class ChartRenderer {
-  #chartInstance: Chart<"scatter", Datum[]>;
+  #chartInstance: ChartType;
   #fakeNodeEvents = new EventEmitter();
   #fakeDocumentEvents = new EventEmitter();
 
@@ -317,24 +307,8 @@ export class ChartRenderer {
       out.push({
         data,
         datasetIndex: element.datasetIndex,
-        view: {
-          x: element.element.x,
-          y: element.element.y,
-        },
       });
     }
-
-    // sort elements by proximity to the cursor
-    out.sort((itemA, itemB) => {
-      const dxA = x - itemA.view.x;
-      const dyA = y - itemA.view.y;
-      const dxB = x - itemB.view.x;
-      const dyB = y - itemB.view.y;
-      const distSquaredA = dxA * dxA + dyA * dyA;
-      const distSquaredB = dxB * dxB + dyB * dyB;
-
-      return distSquaredA - distSquaredB;
-    });
 
     return out;
   }
