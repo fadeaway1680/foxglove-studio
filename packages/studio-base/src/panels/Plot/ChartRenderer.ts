@@ -69,6 +69,38 @@ export type HoverElement = {
   };
 };
 
+type UpdateSizeAction = {
+  type: "size";
+  size: { width: number; height: number };
+};
+
+type UpdateRangeAction = {
+  type: "range";
+  bounds: Bounds1D;
+};
+
+type InteractionEventAction = {
+  type: "event";
+  event: InteractionEvent;
+};
+
+type UpdateHoverAction = {
+  type: "hover";
+  seconds?: number;
+};
+
+type UpdateCurrentTimeAction = {
+  type: "current-time";
+  seconds?: number;
+};
+
+export type RenderAction =
+  | UpdateSizeAction
+  | UpdateRangeAction
+  | InteractionEventAction
+  | UpdateHoverAction
+  | UpdateCurrentTimeAction;
+
 function addEventListener(emitter: EventEmitter) {
   return (eventName: string, fn?: () => void) => {
     const existing = emitter.listeners(eventName);
@@ -226,48 +258,14 @@ export class ChartRenderer {
     this.#chartInstance = chartInstance;
   }
 
-  public setCurrentTime(seconds: number): void {
-    this.#currentValue = seconds;
-  }
-
-  public setHoverValue(seconds?: number): void {
-    this.#hoverValue = seconds;
-  }
-
-  public resetBounds(): void {
-    {
-      const scale = this.#chartInstance.options.scales?.x;
-      if (scale) {
-        scale.min = undefined;
-        scale.max = undefined;
-      }
+  public dispatchActions(actions: Immutable<RenderAction[]>): Bounds | undefined {
+    for (const action of actions) {
+      this.#applyAction(action);
     }
 
-    {
-      const scale = this.#chartInstance.options.scales?.y;
-      if (scale) {
-        scale.min = undefined;
-        scale.max = undefined;
-      }
-    }
-
-    // While the chartjs API doesn't indicate update should be called after resize, in practice
-    // we've found that performing a resize after an update sometimes results in a blank chart.
-    //
     // NOTE: "none" disables animations - this is important for chart performance because we update
     // the entire data set which does not preserve history for the chart animations
     this.#chartInstance.update("none");
-  }
-
-  /**
-   * Apply the array of interaction events and return the new min/max for the x-axis.
-   *
-   * We are only concerned with x-axis bounds because we only ever sync x-axis.
-   */
-  public applyInteractionEvents(events: Immutable<InteractionEvent[]>): Bounds | undefined {
-    for (const event of events) {
-      this.#applyInteractionEvent(event);
-    }
 
     // fill our rpc scales - we only support x and y scales for now
     const xScale = this.#chartInstance.scales.x;
@@ -287,27 +285,6 @@ export class ChartRenderer {
         max: yScale.max,
       },
     };
-  }
-
-  public setSize(size: { width: number; height: number }): void {
-    this.#chartInstance.canvas.width = size.width;
-    this.#chartInstance.canvas.height = size.height;
-    this.#chartInstance.resize();
-  }
-
-  public setXBounds(bounds: Immutable<Bounds1D>): void {
-    const instanceScalesX = this.#chartInstance.options.scales?.x;
-    if (instanceScalesX) {
-      instanceScalesX.min = bounds.min;
-      instanceScalesX.max = bounds.max;
-    }
-
-    // While the chartjs API doesn't indicate update should be called after resize, in practice
-    // we've found that performing a resize after an update sometimes results in a blank chart.
-    //
-    // NOTE: "none" disables animations - this is important for chart performance because we update
-    // the entire data set which does not preserve history for the chart animations
-    this.#chartInstance.update("none");
   }
 
   public getElementsAtPixel(pixel: { x: number; y: number }): HoverElement[] {
@@ -371,10 +348,10 @@ export class ChartRenderer {
     // NOTE: "none" disables animations - this is important for chart performance because we update
     // the entire data set which does not preserve history for the chart animations
     this.#chartInstance.update("none");
-    return this.getXScale();
+    return this.#getXScale();
   }
 
-  public getXScale(): Scale | undefined {
+  #getXScale(): Scale | undefined {
     const xScale = this.#chartInstance.scales.x;
     if (!xScale) {
       return undefined;
@@ -386,6 +363,34 @@ export class ChartRenderer {
       left: xScale.left,
       right: xScale.right,
     };
+  }
+
+  #applyAction(action: Immutable<RenderAction>): void {
+    switch (action.type) {
+      case "size":
+        this.#chartInstance.canvas.width = action.size.width;
+        this.#chartInstance.canvas.height = action.size.height;
+        this.#chartInstance.resize();
+        break;
+      case "hover":
+        this.#hoverValue = action.seconds;
+        break;
+      case "current-time":
+        this.#currentValue = action.seconds;
+        break;
+      case "event":
+        this.#applyInteractionEvent(action.event);
+
+        break;
+      case "range": {
+        const instanceScalesX = this.#chartInstance.options.scales?.x;
+        if (instanceScalesX) {
+          instanceScalesX.min = action.bounds.min;
+          instanceScalesX.max = action.bounds.max;
+        }
+        break;
+      }
+    }
   }
 
   #applyInteractionEvent(event: Immutable<InteractionEvent>): void {

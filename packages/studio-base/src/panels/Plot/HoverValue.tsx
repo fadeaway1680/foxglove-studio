@@ -6,10 +6,10 @@ import { useEffect } from "react";
 
 import { useHoverValue } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 
-import type { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
+import type { PlotCoordinator } from "./PlotCoordinator";
 
 type Props = {
-  chartRenderer?: OffscreenCanvasRenderer;
+  chartRenderer?: PlotCoordinator;
 };
 
 /**

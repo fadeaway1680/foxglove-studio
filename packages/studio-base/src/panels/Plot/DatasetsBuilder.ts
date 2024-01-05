@@ -52,7 +52,7 @@ type Series = {
 };
 
 type ResetSeriesAction = {
-  type: "reset";
+  type: "reset-full";
   series: string;
 };
 
@@ -214,7 +214,7 @@ export class DatasetsBuilder {
 
   #applyAction(action: Immutable<UpdateDataAction>): void {
     switch (action.type) {
-      case "reset": {
+      case "reset-full": {
         const series = this.#seriesByMessagePath.get(action.series);
         if (!series) {
           return;

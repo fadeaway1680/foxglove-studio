@@ -7,7 +7,7 @@ import EventEmitter from "eventemitter3";
 
 import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
-import { isTime, toSec, subtract as subtractTime } from "@foxglove/rostime";
+import { isTime, toSec, subtract as subtractTime, compare } from "@foxglove/rostime";
 import { Immutable, Time, MessageEvent } from "@foxglove/studio";
 import { RosPath } from "@foxglove/studio-base/components/MessagePathSyntax/constants";
 import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
@@ -20,9 +20,15 @@ import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
 import { BlockTopicCursor } from "./BlockTopicCursor";
-import { ChartRenderer, HoverElement, InteractionEvent, Scale } from "./ChartRenderer";
+import {
+  ChartRenderer,
+  HoverElement,
+  InteractionEvent,
+  RenderAction,
+  Scale,
+} from "./ChartRenderer";
+import type { Service } from "./ChartRenderer.worker";
 import type { DataItem, DatasetsBuilder, UpdateDataAction, Viewport } from "./DatasetsBuilder";
-import type { Service } from "./OffscreenCanvasRenderer.worker";
 import type { PlotConfig } from "./types";
 
 type EventTypes = {
@@ -57,7 +63,11 @@ type SeriesItem = {
   blockCursor: BlockTopicCursor;
 };
 
-export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
+/**
+ * PlotCoordinator interfaces commands and updates between the dataset builder and the chart
+ * renderer.
+ */
+export class PlotCoordinator extends EventEmitter<EventTypes> {
   #renderingWorker: Worker;
   #canvas: OffscreenCanvas;
   #renderer?: Promise<Comlink.RemoteObject<ChartRenderer>>;
@@ -77,15 +87,15 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   #startTime?: Time;
   #endTime?: Time;
 
-  #interactionEvents: Immutable<InteractionEvent>[] = [];
-  #pendingSize?: { width: number; height: number };
-  #pendingRange?: Bounds1D;
-  #pendingDataDispatch: UpdateDataAction[] = [];
+  #pendingRenderActions: Immutable<RenderAction>[] = [];
+  #pendingDataDispatch: Immutable<UpdateDataAction>[] = [];
 
   #viewport: Viewport = {
     size: { width: 0, height: 0 },
     bounds: { x: undefined, y: undefined },
   };
+
+  #latestXScale?: Scale;
 
   #queueDispatchRender = debouncePromise(async () => {
     await this.#dispatchRender();
@@ -95,15 +105,13 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     await this.#dispatchDatasets();
   });
 
-  #latestXScale?: Scale;
-
   public constructor(canvas: OffscreenCanvas) {
     super();
 
     this.#canvas = canvas;
     this.#renderingWorker = new Worker(
       // foxglove-depcheck-used: babel-plugin-transform-import-meta
-      new URL("./OffscreenCanvasRenderer.worker", import.meta.url),
+      new URL("./ChartRenderer.worker", import.meta.url),
     );
 
     this.#datasetsBuilderWorker = new Worker(
@@ -114,11 +122,6 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   }
 
   public handleMessagePipelineState(state: Immutable<MessagePipelineContext>): void {
-    // fixme - see subscribe comment in Plot.tsx
-    // for msg path (current) - we render only the latest message data
-    // this is a simplified flow that does not need downsampling or full subscriptions
-    // and we can handle it entirely here
-
     // fixme - seek clears current data?
 
     const activeData = state.playerState.activeData;
@@ -126,9 +129,17 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       return;
     }
 
-    this.#currentTime = activeData.currentTime;
     this.#startTime = activeData.startTime;
     this.#endTime = activeData.endTime;
+
+    if (!this.#currentTime || compare(this.#currentTime, activeData.currentTime) !== 0) {
+      this.#currentTime = activeData.currentTime;
+
+      this.#pendingRenderActions.push({
+        type: "current-time",
+        seconds: toSec(subtractTime(this.#currentTime, this.#startTime)),
+      });
+    }
 
     // If we are using follow mode, then we will update the current time so the plot x-axis range
     // will update the display window
@@ -142,10 +153,13 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
         (this.#timeseriesBounds?.max == undefined || this.#timeseriesBounds.min == undefined) &&
         (min !== this.#baseRange.min || max !== this.#baseRange.max)
       ) {
-        this.#pendingRange = {
-          min: this.#timeseriesBounds?.min ?? min,
-          max: this.#timeseriesBounds?.max ?? max,
-        };
+        this.#pendingRenderActions.push({
+          type: "range",
+          bounds: {
+            min: this.#timeseriesBounds?.min ?? min,
+            max: this.#timeseriesBounds?.max ?? max,
+          },
+        });
       }
 
       this.#baseRange = {
@@ -160,10 +174,13 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
         (this.#timeseriesBounds?.max == undefined || this.#timeseriesBounds.min == undefined) &&
         (min !== this.#baseRange.min || max !== this.#baseRange.max)
       ) {
-        this.#pendingRange = {
-          min: this.#timeseriesBounds?.min ?? min,
-          max: this.#timeseriesBounds?.max ?? max,
-        };
+        this.#pendingRenderActions.push({
+          type: "range",
+          bounds: {
+            min: this.#timeseriesBounds?.min ?? min,
+            max: this.#timeseriesBounds?.max ?? max,
+          },
+        });
       }
       this.#baseRange = {
         min,
@@ -192,7 +209,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       for (const seriesConfig of this.#seriesConfigs) {
         if (seriesConfig.blockCursor.nextWillReset(blocks)) {
           this.#pendingDataDispatch.push({
-            type: "reset",
+            type: "reset-full",
             series: seriesConfig.messagePath,
           });
         }
@@ -270,23 +287,32 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
 
   public setTimeseriesBounds(bounds: Immutable<Partial<Bounds1D>>): void {
     this.#timeseriesBounds = bounds;
-    this.#pendingRange = {
-      min: bounds.min ?? this.#baseRange.min,
-      max: bounds.max ?? this.#baseRange.max,
-    };
+    this.#pendingRenderActions.push({
+      type: "range",
+      bounds: {
+        min: bounds.min ?? this.#baseRange.min,
+        max: bounds.max ?? this.#baseRange.max,
+      },
+    });
     this.#queueDispatchRender();
   }
 
   public resetBounds(): void {
     this.#timeseriesBounds = undefined;
-    this.#pendingRange = this.#baseRange;
+    this.#pendingRenderActions.push({
+      type: "range",
+      bounds: this.#baseRange,
+    });
     this.#viewport.bounds.x = undefined;
     this.#viewport.bounds.y = undefined;
     this.#queueDispatchRender();
   }
 
   public setSize(size: { width: number; height: number }): void {
-    this.#pendingSize = size;
+    this.#pendingRenderActions.push({
+      type: "size",
+      size,
+    });
     this.#queueDispatchRender();
   }
 
@@ -296,14 +322,18 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   }
 
   public addInteractionEvent(ev: InteractionEvent): void {
-    this.#interactionEvents.push(ev);
+    this.#pendingRenderActions.push({
+      type: "event",
+      event: ev,
+    });
     this.#queueDispatchRender();
   }
 
-  // fixme - use dispatch list
-  #hoverValue?: number;
   public setHoverValue(seconds?: number): void {
-    this.#hoverValue = seconds;
+    this.#pendingRenderActions.push({
+      type: "hover",
+      seconds,
+    });
     this.#queueDispatchRender();
   }
 
@@ -334,40 +364,30 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   async #dispatchRender(): Promise<void> {
     const renderer = await this.#rendererInstance();
 
-    if (this.#pendingSize) {
-      const size = this.#pendingSize;
-      this.#pendingSize = undefined;
+    // fixme - filter pending actions to only the last of each kind (except interaction events)
 
-      this.#viewport.size = size;
-      await renderer.setSize(size);
-    }
+    const actions = this.#pendingRenderActions;
+    if (actions.length > 0) {
+      let haveInteractionEvents = false;
+      for (const action of actions) {
+        if (action.type === "size") {
+          this.#viewport.size = action.size;
+        } else if (action.type === "range") {
+          this.#viewport.bounds.x = action.bounds;
+        } else if (action.type === "event") {
+          haveInteractionEvents = true;
+        }
+      }
 
-    if (this.#pendingRange) {
-      const bounds = this.#pendingRange;
-      this.#pendingRange = undefined;
-      this.#viewport.bounds.x = bounds;
-      await renderer.setXBounds(bounds);
-    }
+      this.#pendingRenderActions = [];
+      const bounds = await renderer.dispatchActions(actions);
 
-    // fixme - not every time
-    if (this.#currentTime && this.#startTime) {
-      await renderer.setCurrentTime(toSec(subtractTime(this.#currentTime, this.#startTime)));
-    }
-
-    // fixme - not every time
-    await renderer.setHoverValue(this.#hoverValue);
-
-    const events = this.#interactionEvents;
-    if (events.length > 0) {
-      this.#interactionEvents = [];
-      const bounds = await renderer.applyInteractionEvents(events);
-      if (bounds) {
+      if (haveInteractionEvents && bounds) {
         this.#viewport.bounds = bounds;
         this.emit("timeseriesBounds", bounds.x);
       }
     }
 
-    this.#latestXScale = await renderer.getXScale();
     this.#queueDispatchDatasets();
   }
 

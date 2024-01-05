@@ -42,7 +42,7 @@ import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import { HoverValue } from "./HoverValue";
-import { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
+import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
 import { usePlotPanelSettings } from "./settings";
 import { pathToPayload } from "./subscription";
@@ -136,7 +136,7 @@ export function Plot(props: Props): JSX.Element {
   const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
   const [subscriberId] = useState(() => uuidv4());
   const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
-  const [chartRenderer, setChartRender] = useState<OffscreenCanvasRenderer | undefined>(undefined);
+  const [chartRenderer, setChartRender] = useState<PlotCoordinator | undefined>(undefined);
   const [showReset, setShowReset] = useState(false);
 
   const [activeTooltip, setActiveTooltip] = useState<{
@@ -251,7 +251,7 @@ export function Plot(props: Props): JSX.Element {
     }
 
     const offscreenCanvas = canvas.transferControlToOffscreen();
-    const renderer = new OffscreenCanvasRenderer(offscreenCanvas);
+    const renderer = new PlotCoordinator(offscreenCanvas);
     setChartRender(renderer);
 
     const unsub = subscribeMessasagePipeline((state) => {
@@ -500,7 +500,6 @@ export function Plot(props: Props): JSX.Element {
 
       return pathToPayload(fillInGlobalVariablesInPath(parsed, globalVariables));
     });
-    console.log({ subscriptions });
     setSubscriptions(subscriberId, subscriptions);
   }, [series, setSubscriptions, subscriberId, globalVariables]);
 
@@ -564,11 +563,6 @@ export function Plot(props: Props): JSX.Element {
 
     return values;
   }, [activeTooltip, config.paths.length, config.showPlotValuesInLegend]);
-
-  // fixme
-  // when show values setting is on
-  // - hovering will show the hover value
-  // - playing will show the last value
 
   // The reset view button is shown when we have interacted locally or if the global bounds are set
   // and we are sync'd.
