@@ -35,22 +35,6 @@ type EventTypes = {
   timeseriesBounds(bounds: Immutable<Bounds1D>): void;
 };
 
-function isPrimitive(value: unknown): value is string | bigint | number | boolean | undefined {
-  const type = typeof value;
-  return type === "string" || type === "bigint" || type === "number" || type === "boolean";
-}
-
-function getChartValue(value: unknown): string | bigint | number | boolean | undefined {
-  if (!isPrimitive(value)) {
-    if (isTime(value)) {
-      return toSec(value);
-    }
-    return undefined;
-  }
-
-  return value;
-}
-
 type SeriesItem = {
   key: string;
   messagePath: string;
@@ -87,6 +71,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   #startTime?: Time;
   #endTime?: Time;
 
+  #lastSeekTime = 0;
+
   #pendingRenderActions: Immutable<RenderAction>[] = [];
   #pendingDataDispatch: Immutable<UpdateDataAction>[] = [];
 
@@ -122,12 +108,13 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   public handleMessagePipelineState(state: Immutable<MessagePipelineContext>): void {
-    // fixme - seek clears current data?
-
     const activeData = state.playerState.activeData;
     if (!activeData) {
       return;
     }
+
+    const didSeek = activeData.lastSeekTime !== this.#lastSeekTime;
+    this.#lastSeekTime = activeData.lastSeekTime;
 
     this.#startTime = activeData.startTime;
     this.#endTime = activeData.endTime;
@@ -191,6 +178,13 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     const msgEvents = activeData.messages;
     if (msgEvents.length > 0) {
       for (const seriesConfig of this.#seriesConfigs) {
+        if (didSeek) {
+          this.#pendingDataDispatch.push({
+            type: "reset-current",
+            series: seriesConfig.messagePath,
+          });
+        }
+
         const pathItems = readMessagePathItems(
           msgEvents,
           seriesConfig.parsed,
@@ -466,4 +460,20 @@ function readMessagePathItems(
   }
 
   return out;
+}
+
+function isPrimitive(value: unknown): value is string | bigint | number | boolean | undefined {
+  const type = typeof value;
+  return type === "string" || type === "bigint" || type === "number" || type === "boolean";
+}
+
+function getChartValue(value: unknown): string | bigint | number | boolean | undefined {
+  if (!isPrimitive(value)) {
+    if (isTime(value)) {
+      return toSec(value);
+    }
+    return undefined;
+  }
+
+  return value;
 }

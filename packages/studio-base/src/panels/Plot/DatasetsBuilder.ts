@@ -51,8 +51,13 @@ type Series = {
   full: FullDatum[];
 };
 
-type ResetSeriesAction = {
+type ResetSeriesFullAction = {
   type: "reset-full";
+  series: string;
+};
+
+type ResetSeriesCurrentAction = {
+  type: "reset-current";
   series: string;
 };
 
@@ -68,8 +73,11 @@ type UpdateSeriesFullAction = {
   items: DataItem[];
 };
 
-type UpdateSeriesAction = UpdateSeriesCurrentAction | UpdateSeriesFullAction;
-export type UpdateDataAction = ResetSeriesAction | UpdateSeriesAction;
+export type UpdateDataAction =
+  | ResetSeriesFullAction
+  | ResetSeriesCurrentAction
+  | UpdateSeriesCurrentAction
+  | UpdateSeriesFullAction;
 
 export class DatasetsBuilder {
   #seriesByMessagePath = new Map<string, Series>();
@@ -214,6 +222,16 @@ export class DatasetsBuilder {
 
   #applyAction(action: Immutable<UpdateDataAction>): void {
     switch (action.type) {
+      case "reset-current": {
+        const series = this.#seriesByMessagePath.get(action.series);
+        if (!series) {
+          return;
+        }
+        // when we reset current we make a new array since we'll assume the full will load
+        // we won't need to keep getting current data
+        series.current = [];
+        break;
+      }
       case "reset-full": {
         const series = this.#seriesByMessagePath.get(action.series);
         if (!series) {
