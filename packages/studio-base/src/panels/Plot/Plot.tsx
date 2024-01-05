@@ -184,7 +184,7 @@ export function Plot(props: Props): JSX.Element {
     [chartRenderer, getMessagePipelineState, xAxisVal],
   );
 
-  /*
+  /* fixme
   const getPanelContextMenuItems = useCallback(() => {
     const items: PanelContextMenuItem[] = [
       {
@@ -227,11 +227,15 @@ export function Plot(props: Props): JSX.Element {
     if (!chartRenderer) {
       return;
     }
+
     const unsub = subscribeMessasagePipeline((state) => {
       chartRenderer.handleMessagePipelineState(state);
     });
+
+    // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
+    chartRenderer.handleMessagePipelineState(getMessagePipelineState());
     return unsub;
-  }, [chartRenderer, subscribeMessasagePipeline]);
+  }, [chartRenderer, getMessagePipelineState, subscribeMessasagePipeline]);
 
   useEffect(() => {
     if (!canvasDiv) {
@@ -311,15 +315,11 @@ export function Plot(props: Props): JSX.Element {
 
   useEffect(() => {
     const moveHandler = debouncePromise(async (args: ElementAtPixelArgs) => {
-      mousePresentRef.current = true;
-
       const elements = await chartRenderer?.getElementsAtPixel({
         x: args.canvasX,
         y: args.canvasY,
       });
 
-      // eslint does not understand that mousePresentRef can be unset after the await
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!elements || elements.length === 0 || !mousePresentRef.current) {
         setActiveTooltip(undefined);
         return;
@@ -363,6 +363,7 @@ export function Plot(props: Props): JSX.Element {
   // because react re-uses the SyntheticEvent objects.
   const onMouseMove = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
+      mousePresentRef.current = true;
       const boundingRect = event.currentTarget.getBoundingClientRect();
       buildTooltip?.({
         clientX: event.clientX,

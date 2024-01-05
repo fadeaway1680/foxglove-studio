@@ -16,6 +16,7 @@ import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/Me
 import { MessagePipelineContext } from "@foxglove/studio-base/components/MessagePipeline";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
+import { MessageBlock } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
@@ -64,14 +65,10 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   #datasetsBuilderWorker: Worker;
   #datasetsBuilderRemote: Comlink.Remote<Comlink.RemoteObject<DatasetsBuilder>>;
 
-  #interactionEvents: Immutable<InteractionEvent>[] = [];
   #timeseriesBounds?: Immutable<Partial<Bounds1D>>;
 
-  // why do we have a base range?
+  // fixme - why do we have a base range?
   #baseRange: Bounds1D = { min: 0, max: 1 };
-
-  #pendingSize?: { width: number; height: number };
-  #pendingRange?: Bounds1D;
 
   #seriesConfigs: Immutable<SeriesItem[]> = [];
 
@@ -80,6 +77,9 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
   #startTime?: Time;
   #endTime?: Time;
 
+  #interactionEvents: Immutable<InteractionEvent>[] = [];
+  #pendingSize?: { width: number; height: number };
+  #pendingRange?: Bounds1D;
   #pendingDataDispatch: UpdateDataAction[] = [];
 
   #viewport: Viewport = {
@@ -190,7 +190,6 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     const blocks = state.playerState.progress.messageCache?.blocks;
     if (blocks) {
       for (const seriesConfig of this.#seriesConfigs) {
-        let messageEvents = undefined;
         if (seriesConfig.blockCursor.nextWillReset(blocks)) {
           this.#pendingDataDispatch.push({
             type: "reset",
@@ -198,6 +197,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
           });
         }
 
+        let messageEvents = undefined;
         while ((messageEvents = seriesConfig.blockCursor.next(blocks)) != undefined) {
           const pathItems = readMessagePathItems(
             messageEvents,
