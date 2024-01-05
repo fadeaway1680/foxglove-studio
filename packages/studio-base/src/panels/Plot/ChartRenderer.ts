@@ -11,6 +11,13 @@ import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types"
 import { maybeCast } from "@foxglove/studio-base/util/maybeCast";
 import { fontMonospace } from "@foxglove/theme";
 
+export type Scale = {
+  min: number;
+  max: number;
+  left: number;
+  right: number;
+};
+
 type BaseInteractionEvent = {
   cancelable: boolean;
   deltaY: number;
@@ -109,6 +116,9 @@ export class ChartRenderer {
   #fakeNodeEvents = new EventEmitter();
   #fakeDocumentEvents = new EventEmitter();
 
+  #hoverValue?: number;
+  #currentValue?: number;
+
   public constructor(args: { canvas: OffscreenCanvas; devicePixelRatio: number }) {
     const fakeNode = {
       addEventListener: addEventListener(this.#fakeNodeEvents),
@@ -177,7 +187,24 @@ export class ChartRenderer {
             threshold: 10,
           },
         },
-        //annotation: { annotations: props.annotations },
+        annotation: {
+          annotations: {
+            hoverLine: {
+              type: "line",
+              xMin: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+              xMax: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+              borderColor: "rgb(0 , 99, 132)",
+              borderWidth: 1,
+            },
+            currentLine: {
+              type: "line",
+              xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+              xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+              borderColor: "rgb(255 , 99, 132)",
+              borderWidth: 1,
+            },
+          },
+        },
       },
     };
 
@@ -197,6 +224,14 @@ export class ChartRenderer {
 
     ZoomPlugin.start = origZoomStart;
     this.#chartInstance = chartInstance;
+  }
+
+  public setCurrentTime(seconds: number): void {
+    this.#currentValue = seconds;
+  }
+
+  public setHoverValue(seconds?: number): void {
+    this.#hoverValue = seconds;
   }
 
   public resetBounds(): void {
@@ -327,7 +362,7 @@ export class ChartRenderer {
     return out;
   }
 
-  public updateDatasets(datasets: Dataset[]): void {
+  public updateDatasets(datasets: Dataset[]): Scale | undefined {
     this.#chartInstance.data.datasets = datasets;
 
     // While the chartjs API doesn't indicate update should be called after resize, in practice
@@ -336,6 +371,21 @@ export class ChartRenderer {
     // NOTE: "none" disables animations - this is important for chart performance because we update
     // the entire data set which does not preserve history for the chart animations
     this.#chartInstance.update("none");
+    return this.getXScale();
+  }
+
+  public getXScale(): Scale | undefined {
+    const xScale = this.#chartInstance.scales.x;
+    if (!xScale) {
+      return undefined;
+    }
+
+    return {
+      min: xScale.min,
+      max: xScale.max,
+      left: xScale.left,
+      right: xScale.right,
+    };
   }
 
   #applyInteractionEvent(event: Immutable<InteractionEvent>): void {

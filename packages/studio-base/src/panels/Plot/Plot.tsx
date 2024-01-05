@@ -10,12 +10,14 @@ import { v4 as uuidv4 } from "uuid";
 
 import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
+import { add as addTimes, fromSec } from "@foxglove/rostime";
 import { Immutable } from "@foxglove/studio";
 import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import {
   MessagePipelineContext,
   useMessagePipeline,
+  useMessagePipelineGetter,
   useMessagePipelineSubscribe,
 } from "@foxglove/studio-base/components/MessagePipeline";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
@@ -29,6 +31,8 @@ import TimeBasedChartTooltipContent, {
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import {
   TimelineInteractionStateStore,
+  useClearHoverValue,
+  useSetHoverValue,
   useTimelineInteractionState,
 } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 import useGlobalVariables from "@foxglove/studio-base/hooks/useGlobalVariables";
@@ -36,6 +40,7 @@ import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 
+import { HoverValue } from "./HoverValue";
 import { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
 import { PlotLegend } from "./PlotLegend";
 import { usePlotPanelSettings } from "./settings";
@@ -66,6 +71,7 @@ const useStyles = makeStyles()((theme) => ({
       pointerEvents: "auto",
     },
   },
+  canvasDiv: { width: "100%", height: "100%", overflow: "hidden", cursor: "crosshair" },
 }));
 
 type Props = {
@@ -116,10 +122,10 @@ export function Plot(props: Props): JSX.Element {
     });
   }, [saveConfig, setMessagePathDropConfig]);
 
+  // Migrate legacy Plot-specific title setting to new global title setting
+  // https://github.com/foxglove/studio/pull/5225
   useEffect(() => {
     if (legacyTitle && (customTitle == undefined || customTitle === "")) {
-      // Migrate legacy Plot-specific title setting to new global title setting
-      // https://github.com/foxglove/studio/pull/5225
       saveConfig({
         title: undefined,
         [PANEL_TITLE_CONFIG_KEY]: legacyTitle,
@@ -128,32 +134,55 @@ export function Plot(props: Props): JSX.Element {
   }, [customTitle, legacyTitle, saveConfig]);
 
   const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
+  const [subscriberId] = useState(() => uuidv4());
+  const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
+  const [chartRenderer, setChartRender] = useState<OffscreenCanvasRenderer | undefined>(undefined);
+  const [showReset, setShowReset] = useState(false);
+
+  const [activeTooltip, setActiveTooltip] = useState<{
+    x: number;
+    y: number;
+    data: TimeBasedChartTooltipData[];
+  }>();
 
   usePlotPanelSettings(config, saveConfig, focusedPath);
+
+  const setHoverValue = useSetHoverValue();
+  const clearHoverValue = useClearHoverValue();
 
   const onClickPath = useCallback((index: number) => {
     setFocusedPath(["paths", String(index)]);
   }, []);
 
-  /*
-  const messagePipeline = useMessagePipelineGetter();
-  const onClick = useCallback<NonNullable<ComponentProps<typeof PlotChart>["onClick"]>>(
-    ({ x: seekSeconds }: OnChartClickArgs) => {
+  const getMessagePipelineState = useMessagePipelineGetter();
+  const xAxisVal = config.xAxisVal;
+  const onClick = useCallback(
+    (event: React.MouseEvent<HTMLElement>): void => {
+      // Only timestamp plots support click-to-seek
+      if (xAxisVal !== "timestamp" || !chartRenderer) {
+        return;
+      }
+
       const {
         seekPlayback,
         playerState: { activeData: { startTime: start } = {} },
-      } = messagePipeline();
-      if (!seekPlayback || !start || seekSeconds == undefined || xAxisVal !== "timestamp") {
+      } = getMessagePipelineState();
+
+      if (!seekPlayback || !start) {
         return;
       }
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+
+      const seekSeconds = chartRenderer.getXValueAtPixel(mouseX);
       // Avoid normalizing a negative time if the clicked point had x < 0.
       if (seekSeconds >= 0) {
         seekPlayback(addTimes(start, fromSec(seekSeconds)));
       }
     },
-    [messagePipeline, xAxisVal],
+    [chartRenderer, getMessagePipelineState, xAxisVal],
   );
-  */
 
   /*
   const getPanelContextMenuItems = useCallback(() => {
@@ -179,16 +208,6 @@ export function Plot(props: Props): JSX.Element {
   }, [getFullData, xAxisVal]);
 */
 
-  const [subscriberId] = useState(() => uuidv4());
-  const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
-  const [chartRenderer, setChartRender] = useState<OffscreenCanvasRenderer | undefined>(undefined);
-  const [showReset, setShowReset] = useState(false);
-
-  const [activeTooltip, setActiveTooltip] = useState<{
-    x: number;
-    y: number;
-    data: TimeBasedChartTooltipData[];
-  }>();
   const setSubscriptions = useMessagePipeline(
     useCallback(
       ({ setSubscriptions: pipelineSetSubscriptions }: MessagePipelineContext) =>
@@ -351,8 +370,23 @@ export function Plot(props: Props): JSX.Element {
         canvasX: event.clientX - boundingRect.left,
         canvasY: event.clientY - boundingRect.top,
       });
+
+      // Only timestamp plots support setting the global hover value
+      if (xAxisVal !== "timestamp" || !chartRenderer) {
+        return;
+      }
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const seconds = chartRenderer.getXValueAtPixel(mouseX);
+
+      setHoverValue({
+        componentId: subscriberId,
+        value: seconds,
+        type: "PLAYBACK_SECONDS",
+      });
     },
-    [buildTooltip],
+    [buildTooltip, chartRenderer, setHoverValue, subscriberId, xAxisVal],
   );
 
   // Looking up a tooltip is an async operation so the mouse might leave while the component while
@@ -360,7 +394,8 @@ export function Plot(props: Props): JSX.Element {
   const onMouseOut = useCallback(() => {
     mousePresentRef.current = false;
     setActiveTooltip(undefined);
-  }, []);
+    clearHoverValue(subscriberId);
+  }, [clearHoverValue, subscriberId]);
 
   const tooltipContent = useMemo(() => {
     return activeTooltip ? (
@@ -549,14 +584,16 @@ export function Plot(props: Props): JSX.Element {
           TransitionProps={{ timeout: 0 }}
         >
           <div
-            style={{ width: "100%", height: "100%", overflow: "hidden" }}
+            className={classes.canvasDiv}
             ref={setCanvasDiv}
             onWheel={onWheel}
             onMouseMove={onMouseMove}
             onMouseOut={onMouseOut}
+            onClick={onClick}
           />
         </Tooltip>
       </Stack>
+      <HoverValue chartRenderer={chartRenderer} />
     </Stack>
   );
 }

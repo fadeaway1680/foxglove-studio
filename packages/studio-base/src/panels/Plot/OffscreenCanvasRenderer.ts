@@ -20,7 +20,7 @@ import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
 import { BlockTopicCursor } from "./BlockTopicCursor";
-import { ChartRenderer, HoverElement, InteractionEvent } from "./ChartRenderer";
+import { ChartRenderer, HoverElement, InteractionEvent, Scale } from "./ChartRenderer";
 import type { DataItem, DatasetsBuilder, UpdateDataAction, Viewport } from "./DatasetsBuilder";
 import type { Service } from "./OffscreenCanvasRenderer.worker";
 import type { PlotConfig } from "./types";
@@ -95,6 +95,8 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     await this.#dispatchDatasets();
   });
 
+  #latestXScale?: Scale;
+
   public constructor(canvas: OffscreenCanvas) {
     super();
 
@@ -124,6 +126,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       return;
     }
 
+    this.#currentTime = activeData.currentTime;
     this.#startTime = activeData.startTime;
     this.#endTime = activeData.endTime;
 
@@ -292,6 +295,32 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     this.#queueDispatchRender();
   }
 
+  // fixme - use dispatch list
+  #hoverValue?: number;
+  public setHoverValue(seconds?: number): void {
+    this.#hoverValue = seconds;
+    this.#queueDispatchRender();
+  }
+
+  /** Get the plot x value at the canvas pixel x location */
+  public getXValueAtPixel(pixelX: number): number {
+    if (!this.#latestXScale) {
+      return -1;
+    }
+
+    const pixelRange = this.#latestXScale.right - this.#latestXScale.left;
+    if (pixelRange <= 0) {
+      return -1;
+    }
+
+    // Linear interpolation to place the pixelX value within min/max
+    return (
+      this.#latestXScale.min +
+      ((pixelX - this.#latestXScale.left) / pixelRange) *
+        (this.#latestXScale.max - this.#latestXScale.min)
+    );
+  }
+
   public async getElementsAtPixel(pixel: { x: number; y: number }): Promise<HoverElement[]> {
     const renderer = await this.#rendererInstance();
     return await renderer.getElementsAtPixel(pixel);
@@ -315,6 +344,14 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       await renderer.setXBounds(bounds);
     }
 
+    // fixme - not every time
+    if (this.#currentTime && this.#startTime) {
+      await renderer.setCurrentTime(toSec(subtractTime(this.#currentTime, this.#startTime)));
+    }
+
+    // fixme - not every time
+    await renderer.setHoverValue(this.#hoverValue);
+
     const events = this.#interactionEvents;
     if (events.length > 0) {
       this.#interactionEvents = [];
@@ -325,6 +362,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       }
     }
 
+    this.#latestXScale = await renderer.getXScale();
     this.#queueDispatchDatasets();
   }
 
@@ -340,7 +378,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     const datasets = await this.#datasetsBuilderRemote.getViewportDatasets(this.#viewport);
 
     const renderer = await this.#rendererInstance();
-    await renderer.updateDatasets(datasets);
+    this.#latestXScale = await renderer.updateDatasets(datasets);
   }
 
   async #rendererInstance(): Promise<Comlink.RemoteObject<ChartRenderer>> {
