@@ -478,9 +478,12 @@ export function Plot(props: Props): JSX.Element {
         return;
       }
 
-      const filledParsed = fillInGlobalVariablesInPath(parsed, globalVariables);
-      return pathToPayload(filledParsed);
+      // fixme - a path like /mcnasty/position. resulted in a subscription with an "" empty field name
+      // in fact this path should be invalid
+
+      return pathToPayload(fillInGlobalVariablesInPath(parsed, globalVariables));
     });
+    console.log({ subscriptions });
     setSubscriptions(subscriberId, subscriptions);
   }, [series, setSubscriptions, subscriberId, globalVariables]);
 

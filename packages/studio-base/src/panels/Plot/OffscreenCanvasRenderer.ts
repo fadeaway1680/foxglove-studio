@@ -16,7 +16,6 @@ import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/Me
 import { MessagePipelineContext } from "@foxglove/studio-base/components/MessagePipeline";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
-import { MessageBlock } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
@@ -54,6 +53,7 @@ type SeriesItem = {
   timestampMethod: TimestampMethod;
   showLine: boolean;
   lineSize: number;
+  enabled: boolean;
   blockCursor: BlockTopicCursor;
 };
 
@@ -204,6 +204,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
             seriesConfig.parsed,
             activeData.startTime,
           );
+
           this.#pendingDataDispatch.push({
             type: "append-full",
             series: seriesConfig.messagePath,
@@ -247,6 +248,9 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       // hack for there not being a way to stringify a parsed path
       const key = JSON.stringify(filledParsed) as unknown as string;
 
+      // It is important to keep the existing block cursor for the same series to avoid re-processing
+      // the blocks again when the series remains.
+      const existing = this.#seriesConfigs.find((item) => item.key === key);
       return {
         key,
         messagePath: path.value,
@@ -255,7 +259,8 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
         lineSize: path.lineSize ?? 1.0,
         timestampMethod: path.timestampMethod,
         showLine: path.showLine ?? true,
-        blockCursor: new BlockTopicCursor(parsed.topicName),
+        enabled: path.enabled,
+        blockCursor: existing?.blockCursor ?? new BlockTopicCursor(parsed.topicName),
       };
     });
 
@@ -370,6 +375,12 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
     const dispatch = this.#pendingDataDispatch;
     if (dispatch.length > 0) {
       this.#pendingDataDispatch = [];
+
+      // fixme - filter data dispatch to remove series that are reset
+      // and series that are no longer present
+      // we don't need to send
+      // go backwards from end to start
+
       await this.#datasetsBuilderRemote.updateData(dispatch);
     }
 

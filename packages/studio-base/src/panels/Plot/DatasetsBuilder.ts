@@ -35,6 +35,7 @@ type SeriesConfig = {
   timestampMethod: TimestampMethod;
   showLine: boolean;
   lineSize: number;
+  enabled: boolean;
 };
 
 type FullDatum = DataItem & {
@@ -110,6 +111,10 @@ export class DatasetsBuilder {
 
     const datasets: Dataset[] = [];
     for (const series of this.#seriesByMessagePath.values()) {
+      if (!series.config.enabled) {
+        continue;
+      }
+
       // fixme
       const dataset: Dataset = {
         borderColor: series.config.color,

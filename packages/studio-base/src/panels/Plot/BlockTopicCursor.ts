@@ -14,6 +14,7 @@ import { MessageBlock } from "@foxglove/studio-base/players/types";
  */
 export class BlockTopicCursor {
   #firstBlockRef: Immutable<MessageEvent[]> | undefined;
+  #lastBlockRef: Immutable<MessageEvent[]> | undefined;
 
   #nextBlockIdx = 0;
   #topic: string;
@@ -23,11 +24,15 @@ export class BlockTopicCursor {
   }
 
   /**
-   * Return true if reading _next_ will reset the cursor
+   * Return true if the cursor is invalidated and reading next will start from the beginning
    */
   public nextWillReset(blocks: Immutable<(MessageBlock | undefined)[]>): boolean {
-    const blockTopic = blocks[0]?.messagesByTopic[this.#topic];
-    return blockTopic !== this.#firstBlockRef;
+    const firstBlockRef = blocks[0]?.messagesByTopic[this.#topic];
+
+    const lastIdx = Math.max(0, this.#nextBlockIdx - 1);
+    const lastBlockRef = blocks[lastIdx]?.messagesByTopic[this.#topic];
+
+    return firstBlockRef !== this.#firstBlockRef || lastBlockRef !== this.#lastBlockRef;
   }
 
   /**
@@ -38,10 +43,10 @@ export class BlockTopicCursor {
   public next(
     blocks: Immutable<(MessageBlock | undefined)[]>,
   ): Immutable<MessageEvent[]> | undefined {
-    const blockTopic = blocks[0]?.messagesByTopic[this.#topic];
-    if (blockTopic !== this.#firstBlockRef) {
+    if (this.nextWillReset(blocks)) {
+      const firstBlockRef = blocks[0]?.messagesByTopic[this.#topic];
       this.#nextBlockIdx = 0;
-      this.#firstBlockRef = blockTopic;
+      this.#firstBlockRef = firstBlockRef;
     }
 
     const idx = this.#nextBlockIdx;
@@ -56,6 +61,8 @@ export class BlockTopicCursor {
     }
 
     ++this.#nextBlockIdx;
-    return block.messagesByTopic[this.#topic];
+    const blockTopic = block.messagesByTopic[this.#topic];
+    this.#lastBlockRef = blockTopic;
+    return blockTopic;
   }
 }
