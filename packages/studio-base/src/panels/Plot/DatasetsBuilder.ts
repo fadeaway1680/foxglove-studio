@@ -93,6 +93,8 @@ export type UpdateDataAction =
 
 const MAX_CURRENT_DATUMS = 50_000;
 
+const compareDatum = (a: Datum, b: Datum) => a.x - b.x;
+
 export class DatasetsBuilder {
   #seriesByMessagePath = new Map<string, Series>();
 
@@ -280,7 +282,12 @@ export class DatasetsBuilder {
         );
         series.current.splice(0, cullSize);
 
-        for (const item of action.items) {
+        const sorted =
+          series.config.timestampMethod === "headerStamp"
+            ? action.items.slice().sort(compareDatum)
+            : action.items;
+
+        for (const item of sorted) {
           if (lastX != undefined && item.x <= lastX) {
             continue;
           }
@@ -293,6 +300,10 @@ export class DatasetsBuilder {
             receiveTime: item.receiveTime,
             headerStamp: item.headerStamp,
           });
+        }
+
+        if (series.config.timestampMethod === "headerStamp") {
+          series.current.sort(compareDatum);
         }
         break;
       }
@@ -311,6 +322,10 @@ export class DatasetsBuilder {
             receiveTime: item.receiveTime,
             headerStamp: item.headerStamp,
           });
+        }
+
+        if (series.config.timestampMethod === "headerStamp") {
+          series.full.sort(compareDatum);
         }
 
         // trim current data to remove values present in the full data

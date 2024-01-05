@@ -33,12 +33,19 @@ export type PlotPath = BasePlotPath & {
 };
 export type PlotDataByPath = Map<PlotPath, PlotDataItem[]>;
 
-// X-axis values:
 export type PlotXAxisVal =
-  | "timestamp" // Message playback time. Preloaded.
-  | "index" // Message-path value index. One "current" message at playback time.
-  | "custom" // Message path data. Preloaded.
-  | "currentCustom"; // Message path data. One "current" message at playback time.
+  // x-axis is either receive time since start or header stamp since start
+  | "timestamp"
+  // The message path values from the latest message for each series. The x-axis is the array
+  // "index" of the item and y-axis is the item value
+  | "index"
+  // The x-axis are values from message path items (accumulated). Each series produces y-values from
+  // its message path items. The x/y values are paired by their respective array index locations.
+  | "custom"
+  // Similar to "index" mode except the x-axis the message path item values and the y-axis are the
+  // correspondible series message path value at the same array index. Only the latest message is used
+  // for x-axis and each series
+  | "currentCustom";
 
 // In addition to the base datum, we also add receiveTime and optionally header stamp to our datums
 // These are used in the csv export.

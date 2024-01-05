@@ -194,6 +194,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
         const pathItems = readMessagePathItems(
           msgEvents,
           seriesConfig.parsed,
+          seriesConfig.timestampMethod,
           activeData.startTime,
         );
         this.#pendingDataDispatch.push({
@@ -219,6 +220,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
           const pathItems = readMessagePathItems(
             messageEvents,
             seriesConfig.parsed,
+            seriesConfig.timestampMethod,
             activeData.startTime,
           );
 
@@ -260,14 +262,19 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
       const filledParsed = fillInGlobalVariablesInPath(parsed, globalVariables);
 
-      // fixme - when global variables change the path.value is still the original
-      // string so the builder does not detect that it needs to reset the path
-      // hack for there not being a way to stringify a parsed path
-      const key = JSON.stringify(filledParsed) as unknown as string;
+      // When global variables change the path.value is still the original value with the variable
+      // names But we need to consider this as a new series (new block cursor) so we compute new
+      // values when variables cause the resolved path value to update.
+      //
+      // We also want to re-compute values when the timestamp method changes. So we use a _key_ that
+      // is the filled path and the timestamp method. If either change, we consider this a new
+      // series.
+      const key = (JSON.stringify(filledParsed) as unknown as string) + path.timestampMethod;
 
       // It is important to keep the existing block cursor for the same series to avoid re-processing
       // the blocks again when the series remains.
       const existing = this.#seriesConfigs.find((item) => item.key === key);
+
       return {
         key,
         messagePath: path.value,
@@ -444,6 +451,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 function readMessagePathItems(
   events: Immutable<MessageEvent[]>,
   path: Immutable<RosPath>,
+  timestampMethod: TimestampMethod,
   startTime: Immutable<Time>,
 ): DataItem[] {
   const out = [];
@@ -459,10 +467,13 @@ function readMessagePathItems(
         continue;
       }
 
-      // fixme - extract if using header stamp for path and available
       const headerStamp = getTimestampForMessage(event.message);
+      const timestamp = timestampMethod === "receiveTime" ? event.receiveTime : headerStamp;
+      if (!timestamp) {
+        continue;
+      }
 
-      const xValue = toSec(subtractTime(event.receiveTime, startTime));
+      const xValue = toSec(subtractTime(timestamp, startTime));
       out.push({
         x: xValue,
         y: chartValue,
