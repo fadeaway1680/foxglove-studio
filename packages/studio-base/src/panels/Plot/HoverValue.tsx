@@ -9,7 +9,7 @@ import { useHoverValue } from "@foxglove/studio-base/context/TimelineInteraction
 import type { PlotCoordinator } from "./PlotCoordinator";
 
 type Props = {
-  chartRenderer?: PlotCoordinator;
+  coordinator?: PlotCoordinator;
 };
 
 /**
@@ -19,17 +19,17 @@ type Props = {
  * of what will re-render when the value updates.
  */
 export function HoverValue(props: Props): JSX.Element {
-  const chartRenderer = props.chartRenderer;
+  const coordinator = props.coordinator;
 
   const hoverValue = useHoverValue();
   useEffect(() => {
     if (!hoverValue || hoverValue.type !== "PLAYBACK_SECONDS") {
-      chartRenderer?.setHoverValue(undefined);
+      coordinator?.setHoverValue(undefined);
       return;
     }
 
-    chartRenderer?.setHoverValue(hoverValue.value);
-  }, [chartRenderer, hoverValue]);
+    coordinator?.setHoverValue(hoverValue.value);
+  }, [coordinator, hoverValue]);
 
   return <></>;
 }

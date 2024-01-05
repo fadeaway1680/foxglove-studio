@@ -136,7 +136,7 @@ export function Plot(props: Props): JSX.Element {
   const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
   const [subscriberId] = useState(() => uuidv4());
   const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
-  const [chartRenderer, setChartRender] = useState<PlotCoordinator | undefined>(undefined);
+  const [coordinator, setCoordinator] = useState<PlotCoordinator | undefined>(undefined);
   const [showReset, setShowReset] = useState(false);
 
   const [activeTooltip, setActiveTooltip] = useState<{
@@ -159,7 +159,7 @@ export function Plot(props: Props): JSX.Element {
   const onClick = useCallback(
     (event: React.MouseEvent<HTMLElement>): void => {
       // Only timestamp plots support click-to-seek
-      if (xAxisVal !== "timestamp" || !chartRenderer) {
+      if (xAxisVal !== "timestamp" || !coordinator) {
         return;
       }
 
@@ -175,13 +175,13 @@ export function Plot(props: Props): JSX.Element {
       const rect = event.currentTarget.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
 
-      const seekSeconds = chartRenderer.getXValueAtPixel(mouseX);
+      const seekSeconds = coordinator.getXValueAtPixel(mouseX);
       // Avoid normalizing a negative time if the clicked point had x < 0.
       if (seekSeconds >= 0) {
         seekPlayback(addTimes(start, fromSec(seekSeconds)));
       }
     },
-    [chartRenderer, getMessagePipelineState, xAxisVal],
+    [coordinator, getMessagePipelineState, xAxisVal],
   );
 
   /* fixme
@@ -220,22 +220,8 @@ export function Plot(props: Props): JSX.Element {
   const { globalVariables } = useGlobalVariables();
 
   useEffect(() => {
-    chartRenderer?.handleConfig(config, globalVariables);
-  }, [chartRenderer, config, globalVariables]);
-
-  useEffect(() => {
-    if (!chartRenderer) {
-      return;
-    }
-
-    const unsub = subscribeMessasagePipeline((state) => {
-      chartRenderer.handleMessagePipelineState(state);
-    });
-
-    // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
-    chartRenderer.handleMessagePipelineState(getMessagePipelineState());
-    return unsub;
-  }, [chartRenderer, getMessagePipelineState, subscribeMessasagePipeline]);
+    coordinator?.handleConfig(config, globalVariables);
+  }, [coordinator, config, globalVariables]);
 
   useEffect(() => {
     if (!canvasDiv) {
@@ -251,12 +237,15 @@ export function Plot(props: Props): JSX.Element {
     }
 
     const offscreenCanvas = canvas.transferControlToOffscreen();
-    const renderer = new PlotCoordinator(offscreenCanvas);
-    setChartRender(renderer);
+    const plotCoordinator = new PlotCoordinator(offscreenCanvas);
+    setCoordinator(plotCoordinator);
 
     const unsub = subscribeMessasagePipeline((state) => {
-      renderer.handleMessagePipelineState(state);
+      plotCoordinator.handlePlayerState(state.playerState);
     });
+
+    // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
+    plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -264,7 +253,7 @@ export function Plot(props: Props): JSX.Element {
           continue;
         }
 
-        renderer.setSize({
+        plotCoordinator.setSize({
           width: entry.contentRect.width,
           height: entry.contentRect.height,
         });
@@ -275,19 +264,19 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       unsub();
       resizeObserver.disconnect();
-      renderer.terminate();
+      plotCoordinator.terminate();
       canvasDiv.removeChild(canvas);
     };
-  }, [canvasDiv, subscribeMessasagePipeline]);
+  }, [canvasDiv, getMessagePipelineState, subscribeMessasagePipeline]);
 
   const onWheel = useCallback(
     async (event: React.WheelEvent<HTMLElement>) => {
-      if (!chartRenderer) {
+      if (!coordinator) {
         return;
       }
 
       const boundingRect = event.currentTarget.getBoundingClientRect();
-      chartRenderer.addInteractionEvent({
+      coordinator.addInteractionEvent({
         type: "wheel",
         cancelable: false,
         deltaY: event.deltaY,
@@ -298,7 +287,7 @@ export function Plot(props: Props): JSX.Element {
       });
       setShowReset(true);
     },
-    [chartRenderer],
+    [coordinator],
   );
 
   type ElementAtPixelArgs = {
@@ -315,7 +304,7 @@ export function Plot(props: Props): JSX.Element {
 
   useEffect(() => {
     const moveHandler = debouncePromise(async (args: ElementAtPixelArgs) => {
-      const elements = await chartRenderer?.getElementsAtPixel({
+      const elements = await coordinator?.getElementsAtPixel({
         x: args.canvasX,
         y: args.canvasY,
       });
@@ -352,7 +341,7 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       setBuildTooltip(undefined);
     };
-  }, [chartRenderer]);
+  }, [coordinator]);
 
   // Extract the bounding client rect from currentTarget before calling the debounced function
   // because react re-uses the SyntheticEvent objects.
@@ -368,13 +357,13 @@ export function Plot(props: Props): JSX.Element {
       });
 
       // Only timestamp plots support setting the global hover value
-      if (xAxisVal !== "timestamp" || !chartRenderer) {
+      if (xAxisVal !== "timestamp" || !coordinator) {
         return;
       }
 
       const rect = event.currentTarget.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
-      const seconds = chartRenderer.getXValueAtPixel(mouseX);
+      const seconds = coordinator.getXValueAtPixel(mouseX);
 
       setHoverValue({
         componentId: subscriberId,
@@ -382,7 +371,7 @@ export function Plot(props: Props): JSX.Element {
         type: "PLAYBACK_SECONDS",
       });
     },
-    [buildTooltip, chartRenderer, setHoverValue, subscriberId, xAxisVal],
+    [buildTooltip, coordinator, setHoverValue, subscriberId, xAxisVal],
   );
 
   // Looking up a tooltip is an async operation so the mouse might leave while the component while
@@ -422,7 +411,7 @@ export function Plot(props: Props): JSX.Element {
   }, [activeTooltip, colorsByDatasetIndex, labelsByDatasetIndex, numSeries]);
 
   useEffect(() => {
-    if (!canvasDiv || !chartRenderer) {
+    if (!canvasDiv || !coordinator) {
       return;
     }
 
@@ -432,7 +421,7 @@ export function Plot(props: Props): JSX.Element {
 
     hammerManager.on("panstart", async (event) => {
       const boundingRect = event.target.getBoundingClientRect();
-      chartRenderer.addInteractionEvent({
+      coordinator.addInteractionEvent({
         type: "panstart",
         cancelable: false,
         deltaY: event.deltaY,
@@ -447,7 +436,7 @@ export function Plot(props: Props): JSX.Element {
 
     hammerManager.on("panmove", async (event) => {
       const boundingRect = event.target.getBoundingClientRect();
-      chartRenderer.addInteractionEvent({
+      coordinator.addInteractionEvent({
         type: "panmove",
         cancelable: false,
         deltaY: event.deltaY,
@@ -459,7 +448,7 @@ export function Plot(props: Props): JSX.Element {
     hammerManager.on("panend", async (event) => {
       setShowReset(true);
       const boundingRect = event.target.getBoundingClientRect();
-      chartRenderer.addInteractionEvent({
+      coordinator.addInteractionEvent({
         type: "panend",
         cancelable: false,
         deltaY: event.deltaY,
@@ -471,7 +460,7 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       hammerManager.destroy();
     };
-  }, [canvasDiv, chartRenderer]);
+  }, [canvasDiv, coordinator]);
 
   // We could subscribe in the chart renderer, but doing it with react effects is easier for
   // managing the lifecycle of the subscriptions. The renderer will correlate input message data to
@@ -508,14 +497,14 @@ export function Plot(props: Props): JSX.Element {
       return;
     }
 
-    chartRenderer?.setTimeseriesBounds({
+    coordinator?.setTimeseriesBounds({
       min: globalBounds?.min,
       max: globalBounds?.max,
     });
-  }, [chartRenderer, globalBounds, shouldSync, subscriberId]);
+  }, [coordinator, globalBounds, shouldSync, subscriberId]);
 
   useEffect(() => {
-    if (!chartRenderer || !shouldSync) {
+    if (!coordinator || !shouldSync) {
       return;
     }
 
@@ -527,20 +516,20 @@ export function Plot(props: Props): JSX.Element {
         userInteraction: true,
       });
     };
-    chartRenderer.on("timeseriesBounds", onTimeseriesBounds);
+    coordinator.on("timeseriesBounds", onTimeseriesBounds);
     return () => {
-      chartRenderer.off("timeseriesBounds", onTimeseriesBounds);
+      coordinator.off("timeseriesBounds", onTimeseriesBounds);
     };
-  }, [chartRenderer, setGlobalBounds, shouldSync, subscriberId]);
+  }, [coordinator, setGlobalBounds, shouldSync, subscriberId]);
 
   const onResetView = useCallback(() => {
     setShowReset(false);
-    chartRenderer?.resetBounds();
+    coordinator?.resetBounds();
 
     if (shouldSync) {
       setGlobalBounds(undefined);
     }
-  }, [chartRenderer, setGlobalBounds, shouldSync]);
+  }, [coordinator, setGlobalBounds, shouldSync]);
 
   const valuesBySeriesIndex = useMemo(() => {
     if (!config.showPlotValuesInLegend) {
@@ -625,7 +614,7 @@ export function Plot(props: Props): JSX.Element {
           />
         </Tooltip>
       </Stack>
-      <HoverValue chartRenderer={chartRenderer} />
+      <HoverValue coordinator={coordinator} />
     </Stack>
   );
 }

@@ -13,9 +13,9 @@ import { RosPath } from "@foxglove/studio-base/components/MessagePathSyntax/cons
 import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
 import { simpleGetMessagePathDataItems } from "@foxglove/studio-base/components/MessagePathSyntax/simpleGetMessagePathDataItems";
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
-import { MessagePipelineContext } from "@foxglove/studio-base/components/MessagePipeline";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
+import { PlayerState } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
@@ -107,8 +107,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     this.#datasetsBuilderRemote = Comlink.wrap(this.#datasetsBuilderWorker);
   }
 
-  public handleMessagePipelineState(state: Immutable<MessagePipelineContext>): void {
-    const activeData = state.playerState.activeData;
+  public handlePlayerState(state: Immutable<PlayerState>): void {
+    const activeData = state.activeData;
     if (!activeData) {
       return;
     }
@@ -198,7 +198,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       }
     }
 
-    const blocks = state.playerState.progress.messageCache?.blocks;
+    const blocks = state.progress.messageCache?.blocks;
     if (blocks) {
       for (const seriesConfig of this.#seriesConfigs) {
         if (seriesConfig.blockCursor.nextWillReset(blocks)) {
