@@ -39,6 +39,7 @@ import useGlobalVariables from "@foxglove/studio-base/hooks/useGlobalVariables";
 import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
+import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import { HoverValue } from "./HoverValue";
 import { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
@@ -398,16 +399,33 @@ export function Plot(props: Props): JSX.Element {
     clearHoverValue(subscriberId);
   }, [clearHoverValue, subscriberId]);
 
+  const { colorsByDatasetIndex, labelsByDatasetIndex } = useMemo(() => {
+    const labels: Record<string, string> = {};
+    const colors: Record<string, string> = {};
+
+    for (let idx = 0; idx < config.paths.length; ++idx) {
+      const item = config.paths[idx]!;
+      labels[idx] = item.label ?? item.value;
+      colors[idx] = getLineColor(item.color, idx);
+    }
+
+    return {
+      colorsByDatasetIndex: colors,
+      labelsByDatasetIndex: labels,
+    };
+  }, [config.paths]);
+
+  const numSeries = config.paths.length;
   const tooltipContent = useMemo(() => {
     return activeTooltip ? (
       <TimeBasedChartTooltipContent
         content={activeTooltip.data}
-        multiDataset={false /* fixme datasetsLength > 1 */}
-        colorsByDatasetIndex={{} /* fixme colorsByDatasetIndex */}
-        labelsByDatasetIndex={{} /* fixme labelsByDatasetIndex */}
+        multiDataset={numSeries > 0}
+        colorsByDatasetIndex={colorsByDatasetIndex}
+        labelsByDatasetIndex={labelsByDatasetIndex}
       />
     ) : undefined;
-  }, [activeTooltip]);
+  }, [activeTooltip, colorsByDatasetIndex, labelsByDatasetIndex, numSeries]);
 
   useEffect(() => {
     if (!canvasDiv || !chartRenderer) {

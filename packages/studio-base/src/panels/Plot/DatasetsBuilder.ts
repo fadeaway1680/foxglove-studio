@@ -107,8 +107,6 @@ export class DatasetsBuilder {
     // msg path (current) - x values are the items in the current message only
     // msg path (accumulated) - x values are items from all the messages
 
-    // console.log("down", viewport);
-
     const datasets: Dataset[] = [];
     for (const series of this.#seriesByMessagePath.values()) {
       if (!series.config.enabled) {
@@ -150,6 +148,8 @@ export class DatasetsBuilder {
             allData.push(...series.current);
           }
         }
+      } else {
+        allData.push(...series.current);
       }
 
       let startIdx = 0;

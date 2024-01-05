@@ -384,7 +384,7 @@ export class OffscreenCanvasRenderer extends EventEmitter<EventTypes> {
       await this.#datasetsBuilderRemote.updateData(dispatch);
     }
 
-    // fixme - only do this when datasets change?
+    // fixme - only do this when datasets change because we dispatch for hover events
     // also when viewport changes
     const datasets = await this.#datasetsBuilderRemote.getViewportDatasets(this.#viewport);
 
