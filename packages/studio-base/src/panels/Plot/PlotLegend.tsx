@@ -34,8 +34,8 @@ type Props = Immutable<{
   pathsWithMismatchedDataLengths: string[];
   saveConfig: SaveConfig<PlotConfig>;
   showLegend: boolean;
-  showPlotValuesInLegend: boolean;
   sidebarDimension: number;
+  valuesBySeriesIndex?: string[];
 }>;
 
 const useStyles = makeStyles<void, "grid" | "toggleButton" | "toggleButtonFloating">()(
@@ -148,8 +148,8 @@ function PlotLegendComponent(props: Props): JSX.Element {
     pathsWithMismatchedDataLengths,
     saveConfig,
     showLegend,
-    showPlotValuesInLegend,
     sidebarDimension,
+    valuesBySeriesIndex,
   } = props;
   const { classes, cx } = useStyles();
 
@@ -244,7 +244,7 @@ function PlotLegendComponent(props: Props): JSX.Element {
               path={path}
               paths={paths}
               savePaths={savePaths}
-              showPlotValuesInLegend={showPlotValuesInLegend}
+              value={valuesBySeriesIndex?.[index]}
             />
           ))}
         </div>

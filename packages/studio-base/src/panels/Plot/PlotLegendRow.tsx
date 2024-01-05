@@ -29,8 +29,8 @@ type PlotLegendRowProps = Immutable<{
   onClickPath: () => void;
   path: PlotPath;
   paths: PlotPath[];
+  value?: string;
   savePaths: (paths: PlotPath[]) => void;
-  showPlotValuesInLegend: boolean;
 }>;
 
 export const ROW_HEIGHT = 30;
@@ -96,6 +96,14 @@ const useStyles = makeStyles<void, "plotName" | "actionButton">()((theme, _param
       whiteSpace: "nowrap",
     },
   },
+  plotValue: {
+    display: "flex",
+    alignItems: "center",
+    justifySelf: "stretch",
+    height: ROW_HEIGHT,
+    padding: theme.spacing(0.25, 1, 0.25, 0.25),
+    whiteSpace: "pre-wrap",
+  },
   errorIcon: {
     color: theme.palette.error.main,
   },
@@ -124,7 +132,7 @@ export function PlotLegendRow({
   path,
   paths,
   savePaths,
-  showPlotValuesInLegend,
+  value,
 }: PlotLegendRowProps): JSX.Element {
   const { openPanelSettings } = useWorkspaceActions();
   const { id: panelId } = usePanelContext();
@@ -148,6 +156,8 @@ export function PlotLegendRow({
     }
     savePaths(newPaths);
   };
+
+  const showPlotValuesInLegend = value != undefined;
 
   return (
     <div
@@ -204,6 +214,13 @@ export function PlotLegendRow({
           </Tooltip>
         )}
       </div>
+      {showPlotValuesInLegend && (
+        <div className={classes.plotValue}>
+          <Typography variant="body2" align="right">
+            {value}
+          </Typography>
+        </div>
+      )}
       <div className={classes.actionButton}>
         {index === paths.length ? (
           <ButtonBase title="Add series" aria-label="Add series" onClick={onClickPath}>

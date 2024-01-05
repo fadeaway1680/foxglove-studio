@@ -90,7 +90,6 @@ export function Plot(props: Props): JSX.Element {
     paths: series,
     showLegend,
     legendDisplay = config.showSidebar === true ? "left" : "floating",
-    showPlotValuesInLegend,
     sidebarDimension = config.sidebarWidth ?? defaultSidebarDimension,
     [PANEL_TITLE_CONFIG_KEY]: customTitle,
   } = config;
@@ -549,6 +548,28 @@ export function Plot(props: Props): JSX.Element {
     }
   }, [chartRenderer, setGlobalBounds, shouldSync]);
 
+  const valuesBySeriesIndex = useMemo(() => {
+    if (!config.showPlotValuesInLegend) {
+      return;
+    }
+
+    if (!activeTooltip?.data) {
+      return;
+    }
+
+    const values = new Array(config.paths.length).fill(undefined);
+    for (const item of activeTooltip.data) {
+      values[item.datasetIndex] ??= item.value;
+    }
+
+    return values;
+  }, [activeTooltip, config.paths.length, config.showPlotValuesInLegend]);
+
+  // fixme
+  // when show values setting is on
+  // - hovering will show the hover value
+  // - playing will show the last value
+
   // The reset view button is shown when we have interacted locally or if the global bounds are set
   // and we are sync'd.
   const showResetViewButton = showReset || (globalBounds != undefined && shouldSync);
@@ -578,8 +599,8 @@ export function Plot(props: Props): JSX.Element {
             pathsWithMismatchedDataLengths={EmptyPaths /* fixme */}
             saveConfig={saveConfig}
             showLegend={showLegend}
-            showPlotValuesInLegend={showPlotValuesInLegend}
             sidebarDimension={sidebarDimension}
+            valuesBySeriesIndex={valuesBySeriesIndex}
           />
         )}
         {showResetViewButton && (
