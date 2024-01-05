@@ -2,7 +2,7 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { Immutable } from "@foxglove/studio";
+import { Immutable, Time } from "@foxglove/studio";
 import {
   MAX_POINTS,
   downsampleTimeseries,
@@ -14,7 +14,22 @@ import type { Dataset, Datum } from "./ChartRenderer";
 
 type Size = { width: number; height: number };
 
-export type DataItem = Datum;
+export type DataItem = Datum & {
+  receiveTime: Time;
+  headerStamp?: Time;
+};
+
+type CsvDatum = {
+  x: number;
+  y: number;
+  receiveTime: Time;
+  headerStamp?: Time;
+};
+
+export type CsvDataset = {
+  label: string;
+  data: CsvDatum[];
+};
 
 export type Viewport = {
   // The numeric bounds of the viewport. When x or y are undefined, that axis is not bounded
@@ -37,6 +52,8 @@ type SeriesConfig = {
 };
 
 type FullDatum = Datum & {
+  receiveTime: Time;
+  headerStamp?: Time;
   index: number;
 };
 
@@ -193,10 +210,34 @@ export class DatasetsBuilder {
           continue;
         }
 
-        dataset.data.push(item);
+        dataset.data.push({
+          x: item.x,
+          y: item.y,
+        });
       }
 
       datasets.push(dataset);
+    }
+
+    return datasets;
+  }
+
+  public getCsvData(): CsvDataset[] {
+    const datasets: CsvDataset[] = [];
+    for (const series of this.#seriesByMessagePath.values()) {
+      if (!series.config.enabled) {
+        continue;
+      }
+
+      const allData = series.full.slice();
+      if (series.current.length > 0) {
+        allData.push(...series.current);
+      }
+
+      datasets.push({
+        label: series.config.messagePath,
+        data: allData,
+      });
     }
 
     return datasets;
@@ -249,6 +290,8 @@ export class DatasetsBuilder {
             index: idx,
             x: item.x,
             y: item.y,
+            receiveTime: item.receiveTime,
+            headerStamp: item.headerStamp,
           });
         }
         break;
@@ -265,6 +308,8 @@ export class DatasetsBuilder {
             index: idx,
             x: item.x,
             y: item.y,
+            receiveTime: item.receiveTime,
+            headerStamp: item.headerStamp,
           });
         }
 

@@ -17,7 +17,7 @@ import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types"
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
 import { PlayerState } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
-import { TimestampMethod } from "@foxglove/studio-base/util/time";
+import { TimestampMethod, getTimestampForMessage } from "@foxglove/studio-base/util/time";
 
 import { BlockTopicCursor } from "./BlockTopicCursor";
 import {
@@ -28,7 +28,13 @@ import {
   Scale,
 } from "./ChartRenderer";
 import type { Service } from "./ChartRenderer.worker";
-import type { DataItem, DatasetsBuilder, UpdateDataAction, Viewport } from "./DatasetsBuilder";
+import type {
+  CsvDataset,
+  DataItem,
+  DatasetsBuilder,
+  UpdateDataAction,
+  Viewport,
+} from "./DatasetsBuilder";
 import type { PlotConfig } from "./types";
 
 type EventTypes = {
@@ -355,6 +361,11 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     return await renderer.getElementsAtPixel(pixel);
   }
 
+  /** Get the entire data for all series */
+  public async getCsvData(): Promise<CsvDataset[]> {
+    return await this.#datasetsBuilderRemote.getCsvData();
+  }
+
   async #dispatchRender(): Promise<void> {
     const renderer = await this.#rendererInstance();
 
@@ -436,12 +447,12 @@ function readMessagePathItems(
   startTime: Immutable<Time>,
 ): DataItem[] {
   const out = [];
-  for (const message of events) {
-    if (message.topic !== path.topicName) {
+  for (const event of events) {
+    if (event.topic !== path.topicName) {
       continue;
     }
 
-    const items = simpleGetMessagePathDataItems(message, path);
+    const items = simpleGetMessagePathDataItems(event, path);
     for (const item of items) {
       const chartValue = getChartValue(item);
       if (chartValue == undefined) {
@@ -449,12 +460,14 @@ function readMessagePathItems(
       }
 
       // fixme - extract if using header stamp for path and available
-      // headerStamp: message.headerStamp,
+      const headerStamp = getTimestampForMessage(event.message);
 
-      const xValue = toSec(subtractTime(message.receiveTime, startTime));
+      const xValue = toSec(subtractTime(event.receiveTime, startTime));
       out.push({
         x: xValue,
         y: chartValue,
+        receiveTime: event.receiveTime,
+        headerStamp,
       });
     }
   }

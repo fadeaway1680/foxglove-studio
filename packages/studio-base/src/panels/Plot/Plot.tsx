@@ -21,6 +21,10 @@ import {
   useMessagePipelineSubscribe,
 } from "@foxglove/studio-base/components/MessagePipeline";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
+import {
+  PanelContextMenu,
+  PanelContextMenuItem,
+} from "@foxglove/studio-base/components/PanelContextMenu";
 import PanelToolbar, {
   PANEL_TOOLBAR_MIN_HEIGHT,
 } from "@foxglove/studio-base/components/PanelToolbar";
@@ -44,6 +48,7 @@ import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { HoverValue } from "./HoverValue";
 import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
+import { downloadCSV } from "./csv";
 import { usePlotPanelSettings } from "./settings";
 import { pathToPayload } from "./subscription";
 import { PlotConfig } from "./types";
@@ -78,6 +83,13 @@ const useStyles = makeStyles()((theme) => ({
 type Props = {
   config: PlotConfig;
   saveConfig: SaveConfig<PlotConfig>;
+};
+
+type ElementAtPixelArgs = {
+  clientX: number;
+  clientY: number;
+  canvasX: number;
+  canvasY: number;
 };
 
 const selectGlobalBounds = (store: TimelineInteractionStateStore) => store.globalBounds;
@@ -184,29 +196,23 @@ export function Plot(props: Props): JSX.Element {
     [coordinator, getMessagePipelineState, xAxisVal],
   );
 
-  /* fixme
   const getPanelContextMenuItems = useCallback(() => {
     const items: PanelContextMenuItem[] = [
       {
         type: "item",
         label: "Download plot data as CSV",
         onclick: async () => {
-          // Because the full dataset is never in the rendering thread, we have to request it from the worker.
-          const data = await getFullData();
-          if (data == undefined) {
+          const data = await coordinator?.getCsvData();
+          if (!data) {
             return;
           }
-          const csvDatasets = [];
-          for (const dataset of data.datasets.values()) {
-            csvDatasets.push(dataset);
-          }
-          downloadCSV(csvDatasets, xAxisVal);
+
+          downloadCSV(customTitle ?? "plot_data", data, xAxisVal);
         },
       },
     ];
     return items;
-  }, [getFullData, xAxisVal]);
-*/
+  }, [coordinator, customTitle, xAxisVal]);
 
   const setSubscriptions = useMessagePipeline(
     useCallback(
@@ -290,12 +296,6 @@ export function Plot(props: Props): JSX.Element {
     [coordinator],
   );
 
-  type ElementAtPixelArgs = {
-    clientX: number;
-    clientY: number;
-    canvasX: number;
-    canvasY: number;
-  };
   const [buildTooltip, setBuildTooltip] = useState<
     ((args: ElementAtPixelArgs) => void) | undefined
   >(undefined);
@@ -613,6 +613,7 @@ export function Plot(props: Props): JSX.Element {
             onClick={onClick}
           />
         </Tooltip>
+        <PanelContextMenu getItems={getPanelContextMenuItems} />
       </Stack>
       <HoverValue coordinator={coordinator} />
     </Stack>
