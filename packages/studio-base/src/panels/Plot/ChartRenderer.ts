@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
 import { Chart, ChartDataset, ChartOptions, ScatterDataPoint } from "chart.js";
+import { AnnotationOptions } from "chartjs-plugin-annotation";
 import EventEmitter from "eventemitter3";
 
 import { Zoom as ZoomPlugin } from "@foxglove/chartjs-plugin-zoom";
@@ -84,10 +85,16 @@ type UpdateCurrentTimeAction = {
   seconds?: number;
 };
 
+type ReferenceLinesAction = {
+  type: "references-lines";
+  referenceLines: { color: string; value: number }[];
+};
+
 export type RenderAction =
   | UpdateSizeAction
   | UpdateRangeAction
   | InteractionEventAction
+  | ReferenceLinesAction
   | UpdateHoverAction
   | UpdateCurrentTimeAction;
 
@@ -210,22 +217,24 @@ export class ChartRenderer {
           },
         },
         annotation: {
-          annotations: {
-            hoverLine: {
+          annotations: [
+            {
               type: "line",
+              drawTime: "beforeDatasetsDraw",
               xMin: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
               xMax: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
               borderColor: "rgb(0 , 99, 132)",
               borderWidth: 1,
             },
-            currentLine: {
+            {
               type: "line",
+              drawTime: "beforeDatasetsDraw",
               xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
               xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
               borderColor: "rgb(255 , 99, 132)",
               borderWidth: 1,
             },
-          },
+          ],
         },
       },
     };
@@ -362,6 +371,46 @@ export class ChartRenderer {
           instanceScalesX.min = action.bounds.min;
           instanceScalesX.max = action.bounds.max;
         }
+        break;
+      }
+      case "references-lines": {
+        const annotation = this.#chartInstance.options.plugins?.annotation;
+        if (!annotation) {
+          return;
+        }
+
+        const newAnnotations: AnnotationOptions[] = action.referenceLines.map((config) => {
+          return {
+            type: "line",
+            display: true,
+            drawTime: "beforeDatasetsDraw",
+            scaleID: "y",
+            borderColor: config.color,
+            borderDash: [5, 5],
+            borderWidth: 1,
+            value: config.value,
+          };
+        });
+
+        newAnnotations.push({
+          type: "line",
+          drawTime: "beforeDatasetsDraw",
+          xMin: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+          xMax: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+          borderColor: "rgb(0 , 99, 132)",
+          borderWidth: 1,
+        });
+
+        newAnnotations.push({
+          type: "line",
+          drawTime: "beforeDatasetsDraw",
+          xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+          xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+          borderColor: "rgb(255 , 99, 132)",
+          borderWidth: 1,
+        });
+
+        annotation.annotations = newAnnotations;
         break;
       }
     }

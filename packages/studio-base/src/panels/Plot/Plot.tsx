@@ -40,6 +40,7 @@ import {
   useTimelineInteractionState,
 } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 import useGlobalVariables from "@foxglove/studio-base/hooks/useGlobalVariables";
+import { isReferenceLinePlotPathType } from "@foxglove/studio-base/panels/Plot/internalTypes";
 import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
@@ -474,6 +475,10 @@ export function Plot(props: Props): JSX.Element {
     // and we can handle it entirely here
 
     const subscriptions = filterMap(series, (item): SubscribePayload | undefined => {
+      if (isReferenceLinePlotPathType(item)) {
+        return;
+      }
+
       const parsed = parseRosPath(item.value);
       if (!parsed) {
         return;

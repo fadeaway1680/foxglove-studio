@@ -12,6 +12,7 @@
 //   You may not use this file except in compliance with the License.
 
 import { Time } from "@foxglove/rostime";
+import { Immutable } from "@foxglove/studio";
 import { MessagePathDataItem } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import type { ChartDatum } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { MessageEvent } from "@foxglove/studio-base/players/types";
@@ -72,3 +73,10 @@ export type PlotParams = {
   minYValue: string | number | undefined;
   maxYValue: string | number | undefined;
 };
+
+/**
+ * @returns true if the series config is a reference line
+ */
+export function isReferenceLinePlotPathType(path: Immutable<PlotPath>): boolean {
+  return !isNaN(+path.value);
+}

@@ -35,6 +35,7 @@ import type {
   UpdateDataAction,
   Viewport,
 } from "./DatasetsBuilder";
+import { isReferenceLinePlotPathType } from "./internalTypes";
 import type { PlotConfig } from "./types";
 
 type EventTypes = {
@@ -254,7 +255,32 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
     this.#followRange = config.followingViewWidth;
 
+    const referenceLines = filterMap(config.paths, (path, idx) => {
+      if (!path.enabled || !isReferenceLinePlotPathType(path)) {
+        return;
+      }
+
+      const value = +path.value;
+      if (isNaN(value)) {
+        return;
+      }
+
+      return {
+        color: getLineColor(path.color, idx),
+        value,
+      };
+    });
+
+    this.#pendingRenderActions.push({
+      type: "references-lines",
+      referenceLines,
+    });
+
     this.#seriesConfigs = filterMap(config.paths, (path, idx) => {
+      if (isReferenceLinePlotPathType(path)) {
+        return;
+      }
+
       const parsed = parseRosPath(path.value);
       if (!parsed) {
         return;
