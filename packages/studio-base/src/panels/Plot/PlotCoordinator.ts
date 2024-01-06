@@ -114,6 +114,63 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     this.#datasetsBuilderRemote = Comlink.wrap(this.#datasetsBuilderWorker);
   }
 
+  public indexModeHandlePlayerState(state: Immutable<PlayerState>): void {
+    const activeData = state.activeData;
+    if (!activeData) {
+      return;
+    }
+
+    const msgEvents = activeData.messages;
+    if (msgEvents.length > 0) {
+      for (const seriesConfig of this.#seriesConfigs) {
+        this.#pendingDataDispatch.push({
+          type: "reset-current",
+          series: seriesConfig.messagePath,
+        });
+
+        // loop over the events backwards and once we find our first matching topic
+        // read that for the path items
+
+        for (let i = msgEvents.length - 1; i >= 0; --i) {
+          const msgEvent = msgEvents[i]!;
+          if (msgEvent.topic !== seriesConfig.parsed.topicName) {
+            continue;
+          }
+
+          this.#pendingDataDispatch.push({
+            type: "reset-current",
+            series: seriesConfig.messagePath,
+          });
+
+          const items = simpleGetMessagePathDataItems(msgEvent, seriesConfig.parsed);
+          const pathItems = items.map((item, idx) => {
+            const chartValue = getChartValue(item);
+            return {
+              x: idx,
+              y: chartValue ?? NaN,
+              receiveTime: msgEvent.receiveTime,
+            };
+          });
+
+          this.#pendingDataDispatch.push({
+            type: "append-current",
+            series: seriesConfig.messagePath,
+            items: pathItems,
+          });
+
+          // The base range max is the largest size of any series
+          this.#baseRange = {
+            min: 0,
+            max: Math.max(this.#baseRange.min, items.length),
+          };
+          break;
+        }
+      }
+    }
+
+    this.#queueDispatchRender();
+  }
+
   public handlePlayerState(state: Immutable<PlayerState>): void {
     const activeData = state.activeData;
     if (!activeData) {

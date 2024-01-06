@@ -10,6 +10,7 @@ import type { PlotCoordinator } from "./PlotCoordinator";
 
 type Props = {
   coordinator?: PlotCoordinator;
+  enabled: boolean;
 };
 
 /**
@@ -20,8 +21,12 @@ type Props = {
  */
 export function HoverValue(props: Props): JSX.Element {
   const coordinator = props.coordinator;
+  const enabled = props.enabled;
 
-  const hoverValue = useHoverValue();
+  const hoverValue = useHoverValue({
+    disableUpdates: !enabled,
+  });
+
   useEffect(() => {
     if (!hoverValue || hoverValue.type !== "PLAYBACK_SECONDS") {
       coordinator?.setHoverValue(undefined);

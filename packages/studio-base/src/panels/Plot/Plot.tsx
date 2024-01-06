@@ -248,11 +248,19 @@ export function Plot(props: Props): JSX.Element {
     setCoordinator(plotCoordinator);
 
     const unsub = subscribeMessasagePipeline((state) => {
-      plotCoordinator.handlePlayerState(state.playerState);
+      if (xAxisVal === "index") {
+        plotCoordinator.indexModeHandlePlayerState(state.playerState);
+      } else {
+        plotCoordinator.handlePlayerState(state.playerState);
+      }
     });
 
     // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
-    plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
+    if (xAxisVal === "index") {
+      plotCoordinator.indexModeHandlePlayerState(getMessagePipelineState().playerState);
+    } else {
+      plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
+    }
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -620,7 +628,7 @@ export function Plot(props: Props): JSX.Element {
         </Tooltip>
         <PanelContextMenu getItems={getPanelContextMenuItems} />
       </Stack>
-      <HoverValue coordinator={coordinator} />
+      <HoverValue coordinator={coordinator} enabled={xAxisVal === "timestamp"} />
     </Stack>
   );
 }

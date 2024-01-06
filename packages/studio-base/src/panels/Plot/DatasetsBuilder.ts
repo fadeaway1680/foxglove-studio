@@ -5,6 +5,7 @@
 import { Immutable, Time } from "@foxglove/studio";
 import {
   MAX_POINTS,
+  downsampleScatter,
   downsampleTimeseries,
 } from "@foxglove/studio-base/components/TimeBasedChart/downsample";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
@@ -139,7 +140,7 @@ export class DatasetsBuilder {
 
       const dataset: Dataset = {
         borderColor: series.config.color,
-        showLine: true,
+        showLine: series.config.showLine,
         fill: false,
         borderWidth: series.config.lineSize,
         pointRadius: series.config.lineSize * 1.2,
@@ -186,23 +187,26 @@ export class DatasetsBuilder {
 
       const items = allData.slice(startIdx, endIdx + 1);
 
-      const maxPoints = MAX_POINTS / numSeries;
-      const downsampledIndicies = downsampleTimeseries(
-        items,
-        {
-          width: viewport.size.width,
-          height: viewport.size.height,
-          bounds: {
-            x: viewport.bounds.x ?? xBounds,
-            y: viewport.bounds.y ?? yBounds,
-          },
+      const downsampleViewport = {
+        width: viewport.size.width,
+        height: viewport.size.height,
+        bounds: {
+          x: viewport.bounds.x ?? xBounds,
+          y: viewport.bounds.y ?? yBounds,
         },
-        maxPoints,
-      );
+      };
+
+      const maxPoints = MAX_POINTS / numSeries;
+      const downsampledIndicies =
+        dataset.showLine === true
+          ? downsampleTimeseries(items, downsampleViewport, maxPoints)
+          : downsampleScatter(items, downsampleViewport);
 
       // When a series is downsampled the points are disabled as a visual indicator that
       // data is downsampled.
-      if (downsampledIndicies.length < items.length) {
+      //
+      // If show line is false then we must show points otherwise nothing will be displayed
+      if (downsampledIndicies.length < items.length && dataset.showLine === true) {
         dataset.pointRadius = 0;
       }
 
