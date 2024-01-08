@@ -144,9 +144,9 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
   }
 
   /**
-   * Add a transform to the transform history maintained by this frame. When the overfill
-   * limit has been reached, the history is trimmed by removing the larger portion of either
-   * frames that are outside of the `maxStorageTime` or the oldest frames over `maxCapacity`.
+   * Add a transform to the transform history maintained by this frame. When the maximum capacity
+   * has been reached, the history is trimmed by removing the larger portion of either
+   * frames that are outside of the `maxStorageTime` or the last quarter of oldest frames.
    * This is to amortize the cost of trimming the history ever time a new transform is added.
    *
    * If a transform with an identical timestamp already exists, it is replaced.
@@ -160,7 +160,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
     // Remove transforms that are too old
     const transformsFull = this.#transforms.size >= this.maxCapacity;
 
-    // Trim down to the maximum history size if we've exceeded the overfill
+    // Trim down to the maximum history size if we've exceeded the capacity
     if (transformsFull) {
       // remove a quarter of old transforms
       const removeBeforeIndex = Math.floor(this.maxCapacity * MAX_CAPACITY_EVICT_AMOUNT);
