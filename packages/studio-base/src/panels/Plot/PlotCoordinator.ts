@@ -110,6 +110,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
           max: this.#timeseriesBounds?.max ?? datasetBounds.max,
         },
       });
+      this.#datasetBounds = datasetBounds;
     }
 
     this.#queueDispatchRender();
