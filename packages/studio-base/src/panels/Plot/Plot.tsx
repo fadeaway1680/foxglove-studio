@@ -47,6 +47,7 @@ import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
+import { CurrentCustomDatasetsBuilder } from "./CurrentCustomDatasetsBuilder";
 import { HoverValue } from "./HoverValue";
 import { IndexDatasetsBuilder } from "./IndexDatasetsBuilder";
 import { PlotCoordinator } from "./PlotCoordinator";
@@ -239,12 +240,31 @@ export function Plot(props: Props): JSX.Element {
         return new TimeseriesDatasetsBuilder();
       case "index":
         return new IndexDatasetsBuilder();
+      case "currentCustom":
+        return new CurrentCustomDatasetsBuilder();
       default:
         throw new Error(`unsupported mode: ${xAxisVal}`);
     }
 
     return undefined;
   }, [xAxisVal]);
+
+  useEffect(() => {
+    if (datasetsBuilder instanceof CurrentCustomDatasetsBuilder) {
+      if (!xAxisPath?.value) {
+        datasetsBuilder.setXPath(undefined);
+        return;
+      }
+
+      const parsed = parseRosPath(xAxisPath.value);
+      if (!parsed) {
+        datasetsBuilder.setXPath(undefined);
+        return;
+      }
+
+      datasetsBuilder.setXPath(fillInGlobalVariablesInPath(parsed, globalVariables));
+    }
+  }, [datasetsBuilder, globalVariables, xAxisPath]);
 
   useEffect(() => {
     if (!canvasDiv || !datasetsBuilder) {
