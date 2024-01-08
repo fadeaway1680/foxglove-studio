@@ -19,12 +19,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { makeStyles } from "tss-react/mui";
 
 import { fromSec } from "@foxglove/rostime";
-import Plot from "@foxglove/studio-base/panels/Plot";
-import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import { BlockCache, MessageEvent } from "@foxglove/studio-base/players/types";
 import PanelSetup, { Fixture, triggerWheel } from "@foxglove/studio-base/stories/PanelSetup";
 import { useReadySignal, ReadySignal } from "@foxglove/studio-base/stories/ReadySignalContext";
 import { RosDatatypes } from "@foxglove/studio-base/types/RosDatatypes";
+
+import Plot from "./index";
+import { PlotConfig } from "./types";
 
 const locationMessages = [
   {

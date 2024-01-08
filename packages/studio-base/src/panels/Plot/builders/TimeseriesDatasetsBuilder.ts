@@ -13,8 +13,6 @@ import { simpleGetMessagePathDataItems } from "@foxglove/studio-base/components/
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
-import { Dataset } from "@foxglove/studio-base/panels/Plot/ChartRenderer";
-import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import { PlayerState } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 import { TimestampMethod, getTimestampForMessage } from "@foxglove/studio-base/util/time";
@@ -26,7 +24,9 @@ import type {
   TimeseriesDatasetsBuilderImpl,
   UpdateDataAction,
 } from "./TimeseriesDatasetsBuilderImpl";
-import { isReferenceLinePlotPathType } from "./internalTypes";
+import { Dataset } from "../ChartRenderer";
+import { isReferenceLinePlotPathType } from "../internalTypes";
+import { PlotConfig } from "../types";
 
 type SeriesItem = {
   key: string;

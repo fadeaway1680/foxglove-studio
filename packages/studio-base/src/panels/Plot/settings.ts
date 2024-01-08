@@ -10,11 +10,11 @@ import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsTreeAction, SettingsTreeNode, SettingsTreeNodes } from "@foxglove/studio";
-import { PlotPath } from "@foxglove/studio-base/panels/Plot/internalTypes";
 import { usePanelSettingsTreeUpdate } from "@foxglove/studio-base/providers/PanelStateContextProvider";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { lineColors } from "@foxglove/studio-base/util/plotColors";
 
+import { PlotPath } from "./internalTypes";
 import { plotableRosTypes, PlotConfig, plotPathDisplayName } from "./types";
 
 export const DEFAULT_PATH: PlotPath = Object.freeze({

@@ -11,8 +11,8 @@ import {
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
-import type { Dataset, Datum } from "./ChartRenderer";
 import { CsvDataset, Viewport } from "./IDatasetsBuilder";
+import type { Dataset, Datum } from "../ChartRenderer";
 
 export type DataItem = Datum & {
   receiveTime: Time;

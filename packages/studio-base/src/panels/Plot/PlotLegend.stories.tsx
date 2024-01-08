@@ -8,11 +8,12 @@ import { useCallback } from "react";
 import { useAsync } from "react-use";
 
 import Stack from "@foxglove/studio-base/components/Stack";
-import Plot from "@foxglove/studio-base/panels/Plot";
-import { fixture, paths } from "@foxglove/studio-base/panels/Plot/index.stories";
-import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import PanelSetup from "@foxglove/studio-base/stories/PanelSetup";
 import { useReadySignal, ReadySignal } from "@foxglove/studio-base/stories/ReadySignalContext";
+
+import Plot from "./Plot";
+import { fixture, paths } from "./index.stories";
+import { PlotConfig } from "./types";
 
 export default {
   title: "panels/Plot/PlotLegend",

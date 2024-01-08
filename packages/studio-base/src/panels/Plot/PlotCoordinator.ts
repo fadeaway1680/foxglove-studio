@@ -22,7 +22,7 @@ import {
   Scale,
 } from "./ChartRenderer";
 import type { Service } from "./ChartRenderer.worker";
-import { CsvDataset, IDatasetsBuilder, Viewport } from "./IDatasetsBuilder";
+import { CsvDataset, IDatasetsBuilder, Viewport } from "./builders/IDatasetsBuilder";
 import { isReferenceLinePlotPathType } from "./internalTypes";
 import type { PlotConfig } from "./types";
 

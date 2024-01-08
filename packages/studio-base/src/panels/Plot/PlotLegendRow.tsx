@@ -18,10 +18,10 @@ import { Immutable } from "@foxglove/studio";
 import { usePanelContext } from "@foxglove/studio-base/components/PanelContext";
 import { useSelectedPanels } from "@foxglove/studio-base/context/CurrentLayoutContext";
 import { useWorkspaceActions } from "@foxglove/studio-base/context/Workspace/useWorkspaceActions";
-import { plotPathDisplayName } from "@foxglove/studio-base/panels/Plot/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import { PlotPath } from "./internalTypes";
+import { plotPathDisplayName } from "./types";
 
 type PlotLegendRowProps = Immutable<{
   hasMismatchedDataLength: boolean;

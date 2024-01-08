@@ -12,13 +12,13 @@ import { simpleGetMessagePathDataItems } from "@foxglove/studio-base/components/
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
-import { Dataset } from "@foxglove/studio-base/panels/Plot/ChartRenderer";
-import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import { PlayerState } from "@foxglove/studio-base/players/types";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import { CsvDataset, IDatasetsBuilder } from "./IDatasetsBuilder";
-import { Datum, isReferenceLinePlotPathType } from "./internalTypes";
+import { Dataset } from "../ChartRenderer";
+import { Datum, isReferenceLinePlotPathType } from "../internalTypes";
+import { PlotConfig } from "../types";
 
 type DatumWithReceiveTime = Datum & {
   receiveTime: Time;

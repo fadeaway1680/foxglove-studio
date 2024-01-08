@@ -40,19 +40,19 @@ import {
   useTimelineInteractionState,
 } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 import useGlobalVariables from "@foxglove/studio-base/hooks/useGlobalVariables";
-import { TimeseriesDatasetsBuilder } from "@foxglove/studio-base/panels/Plot/TimeseriesDatasetsBuilder";
-import { isReferenceLinePlotPathType } from "@foxglove/studio-base/panels/Plot/internalTypes";
 import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
-import { CurrentCustomDatasetsBuilder } from "./CurrentCustomDatasetsBuilder";
 import { HoverValue } from "./HoverValue";
-import { IndexDatasetsBuilder } from "./IndexDatasetsBuilder";
 import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
+import { CurrentCustomDatasetsBuilder } from "./builders/CurrentCustomDatasetsBuilder";
+import { IndexDatasetsBuilder } from "./builders/IndexDatasetsBuilder";
+import { TimeseriesDatasetsBuilder } from "./builders/TimeseriesDatasetsBuilder";
 import { downloadCSV } from "./csv";
+import { isReferenceLinePlotPathType } from "./internalTypes";
 import { usePlotPanelSettings } from "./settings";
 import { pathToPayload } from "./subscription";
 import { PlotConfig } from "./types";

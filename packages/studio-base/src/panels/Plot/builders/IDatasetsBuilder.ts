@@ -7,8 +7,8 @@ import type { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/t
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
 import type { PlayerState } from "@foxglove/studio-base/players/types";
 
-import type { Dataset } from "./ChartRenderer";
-import { PlotConfig } from "./types";
+import type { Dataset } from "../ChartRenderer";
+import { PlotConfig } from "../types";
 
 type CsvDatum = {
   x: number;

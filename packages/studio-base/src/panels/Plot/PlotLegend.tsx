@@ -17,12 +17,12 @@ import tinycolor from "tinycolor2";
 import { makeStyles } from "tss-react/mui";
 
 import { Immutable } from "@foxglove/studio";
-import { PlotLegendRow, ROW_HEIGHT } from "@foxglove/studio-base/panels/Plot/PlotLegendRow";
-import { PlotPath } from "@foxglove/studio-base/panels/Plot/internalTypes";
-import { PlotConfig } from "@foxglove/studio-base/panels/Plot/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
 
+import { PlotLegendRow, ROW_HEIGHT } from "./PlotLegendRow";
+import { PlotPath } from "./internalTypes";
 import { DEFAULT_PATH } from "./settings";
+import { PlotConfig } from "./types";
 
 const minLegendWidth = 25;
 const maxLegendWidth = 800;
