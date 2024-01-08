@@ -110,7 +110,7 @@ export class CurrentCustomDatasetsBuilder implements IDatasetsBuilder {
     return range;
   }
 
-  public setXPath(path: Immutable<RosPath>): void {
+  public setXPath(path: Immutable<RosPath> | undefined): void {
     if (JSON.stringify(path) === JSON.stringify(this.#parsedPath)) {
       return;
     }
