@@ -40,6 +40,7 @@ import {
   useTimelineInteractionState,
 } from "@foxglove/studio-base/context/TimelineInteractionStateContext";
 import useGlobalVariables from "@foxglove/studio-base/hooks/useGlobalVariables";
+import { TimeseriesDatasetsBuilder } from "@foxglove/studio-base/panels/Plot/TimeseriesDatasetsBuilder";
 import { isReferenceLinePlotPathType } from "@foxglove/studio-base/panels/Plot/internalTypes";
 import { SubscribePayload } from "@foxglove/studio-base/players/types";
 import { SaveConfig } from "@foxglove/studio-base/types/panels";
@@ -102,6 +103,8 @@ export function Plot(props: Props): JSX.Element {
     title: legacyTitle,
     paths: series,
     showLegend,
+    xAxisVal,
+    xAxisPath,
     legendDisplay = config.showSidebar === true ? "left" : "floating",
     sidebarDimension = config.sidebarWidth ?? defaultSidebarDimension,
     [PANEL_TITLE_CONFIG_KEY]: customTitle,
@@ -168,7 +171,6 @@ export function Plot(props: Props): JSX.Element {
   }, []);
 
   const getMessagePipelineState = useMessagePipelineGetter();
-  const xAxisVal = config.xAxisVal;
   const onClick = useCallback(
     (event: React.MouseEvent<HTMLElement>): void => {
       // Only timestamp plots support click-to-seek
@@ -230,8 +232,16 @@ export function Plot(props: Props): JSX.Element {
     coordinator?.handleConfig(config, globalVariables);
   }, [coordinator, config, globalVariables]);
 
+  const datasetsBuilder = useMemo(() => {
+    if (xAxisVal === "timestamp") {
+      return new TimeseriesDatasetsBuilder();
+    }
+
+    return undefined;
+  }, [xAxisVal]);
+
   useEffect(() => {
-    if (!canvasDiv) {
+    if (!canvasDiv || !datasetsBuilder) {
       return;
     }
     const canvas = document.createElement("canvas");
@@ -244,23 +254,15 @@ export function Plot(props: Props): JSX.Element {
     }
 
     const offscreenCanvas = canvas.transferControlToOffscreen();
-    const plotCoordinator = new PlotCoordinator(offscreenCanvas);
+    const plotCoordinator = new PlotCoordinator(offscreenCanvas, datasetsBuilder);
     setCoordinator(plotCoordinator);
 
     const unsub = subscribeMessasagePipeline((state) => {
-      if (xAxisVal === "index") {
-        plotCoordinator.indexModeHandlePlayerState(state.playerState);
-      } else {
-        plotCoordinator.handlePlayerState(state.playerState);
-      }
+      plotCoordinator.handlePlayerState(state.playerState);
     });
 
     // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
-    if (xAxisVal === "index") {
-      plotCoordinator.indexModeHandlePlayerState(getMessagePipelineState().playerState);
-    } else {
-      plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
-    }
+    plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -279,10 +281,10 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       unsub();
       resizeObserver.disconnect();
-      plotCoordinator.terminate();
+      plotCoordinator.destroy();
       canvasDiv.removeChild(canvas);
     };
-  }, [canvasDiv, getMessagePipelineState, subscribeMessasagePipeline]);
+  }, [canvasDiv, datasetsBuilder, getMessagePipelineState, subscribeMessasagePipeline]);
 
   const onWheel = useCallback(
     async (event: React.WheelEvent<HTMLElement>) => {
@@ -475,13 +477,6 @@ export function Plot(props: Props): JSX.Element {
   // managing the lifecycle of the subscriptions. The renderer will correlate input message data to
   // the correct series.
   useEffect(() => {
-    // fixme - xAxisPath
-
-    // fixme
-    // for x-axis: msg path (current) - we render only the latest message data
-    // this is a simplified flow that does not need downsampling or full subscriptions
-    // and we can handle it entirely here
-
     const subscriptions = filterMap(series, (item): SubscribePayload | undefined => {
       if (isReferenceLinePlotPathType(item)) {
         return;
@@ -497,8 +492,19 @@ export function Plot(props: Props): JSX.Element {
 
       return pathToPayload(fillInGlobalVariablesInPath(parsed, globalVariables));
     });
+
+    if ((xAxisVal === "custom" || xAxisVal === "currentCustom") && xAxisPath) {
+      const parsed = parseRosPath(xAxisPath.value);
+      if (parsed) {
+        const sub = pathToPayload(fillInGlobalVariablesInPath(parsed, globalVariables));
+        if (sub) {
+          subscriptions.push(sub);
+        }
+      }
+    }
+
     setSubscriptions(subscriberId, subscriptions);
-  }, [series, setSubscriptions, subscriberId, globalVariables]);
+  }, [series, setSubscriptions, subscriberId, globalVariables, xAxisVal, xAxisPath]);
 
   const globalBounds = useTimelineInteractionState(selectGlobalBounds);
   const setGlobalBounds = useTimelineInteractionState(selectSetGlobalBounds);

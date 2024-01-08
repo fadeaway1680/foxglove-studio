@@ -6,7 +6,7 @@ import { Immutable } from "@foxglove/studio";
 import { downloadFiles } from "@foxglove/studio-base/util/download";
 import { formatTimeRaw } from "@foxglove/studio-base/util/time";
 
-import { CsvDataset } from "./DatasetsBuilder";
+import { CsvDataset } from "./IDatasetsBuilder";
 import { PlotXAxisVal } from "./internalTypes";
 
 function getCSVRow(label: string, data: CsvDataset["data"][0]) {

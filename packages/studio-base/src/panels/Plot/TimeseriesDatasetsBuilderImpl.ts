@@ -12,37 +12,14 @@ import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types"
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
 import type { Dataset, Datum } from "./ChartRenderer";
-
-type Size = { width: number; height: number };
+import { CsvDataset, Viewport } from "./IDatasetsBuilder";
 
 export type DataItem = Datum & {
   receiveTime: Time;
   headerStamp?: Time;
 };
 
-type CsvDatum = {
-  x: number;
-  y: number;
-  receiveTime: Time;
-  headerStamp?: Time;
-};
-
-export type CsvDataset = {
-  label: string;
-  data: CsvDatum[];
-};
-
-export type Viewport = {
-  // The numeric bounds of the viewport. When x or y are undefined, that axis is not bounded
-  // and assumed to display the entire range from the data.
-  bounds: {
-    x?: Bounds1D;
-    y?: Bounds1D;
-  };
-  size: Size;
-};
-
-type SeriesConfig = {
+export type SeriesConfig = {
   key: string;
   messagePath: string;
   color: string;
@@ -96,7 +73,7 @@ const MAX_CURRENT_DATUMS = 50_000;
 
 const compareDatum = (a: Datum, b: Datum) => a.x - b.x;
 
-export class DatasetsBuilder {
+export class TimeseriesDatasetsBuilderImpl {
   #seriesByMessagePath = new Map<string, Series>();
 
   public updateData(actions: Immutable<UpdateDataAction[]>): void {
