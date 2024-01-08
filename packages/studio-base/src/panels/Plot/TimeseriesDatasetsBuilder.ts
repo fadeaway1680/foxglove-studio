@@ -22,7 +22,10 @@ import { TimestampMethod, getTimestampForMessage } from "@foxglove/studio-base/u
 import { BlockTopicCursor } from "./BlockTopicCursor";
 import { CsvDataset, IDatasetsBuilder, Viewport } from "./IDatasetsBuilder";
 import type { DataItem } from "./TimeseriesDatasetsBuilderImpl";
-import { TimeseriesDatasetsBuilderImpl, UpdateDataAction } from "./TimeseriesDatasetsBuilderImpl";
+import type {
+  TimeseriesDatasetsBuilderImpl,
+  UpdateDataAction,
+} from "./TimeseriesDatasetsBuilderImpl";
 import { isReferenceLinePlotPathType } from "./internalTypes";
 
 type SeriesItem = {
@@ -52,7 +55,7 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
   public constructor() {
     this.#datasetsBuilderWorker = new Worker(
       // foxglove-depcheck-used: babel-plugin-transform-import-meta
-      new URL("./datasets.worker", import.meta.url),
+      new URL("./TimeseriesDatasetsBuilderImpl.worker", import.meta.url),
     );
     this.#datasetsBuilderRemote = Comlink.wrap(this.#datasetsBuilderWorker);
   }

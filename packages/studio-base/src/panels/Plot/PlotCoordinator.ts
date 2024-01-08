@@ -91,6 +91,12 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
     const datasetBounds = this.#datasetsBuilder.handlePlayerState(state);
 
+    // fixme - logically this is easier to think about if you consider each one overriding the next
+    // highest precedent value is the config xmin/max values
+    // then the dataset bounds
+    // then the timeseries bounds
+    // then the current interaction bounds
+
     if (
       datasetBounds &&
       (this.#timeseriesBounds?.max == undefined || this.#timeseriesBounds.min == undefined) &&

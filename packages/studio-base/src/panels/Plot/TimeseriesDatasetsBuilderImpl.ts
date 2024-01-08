@@ -102,12 +102,6 @@ export class TimeseriesDatasetsBuilderImpl {
   }
 
   public getViewportDatasets(viewport: Immutable<Viewport>): Dataset[] {
-    // timestamp plots - the x value is calculated as offset from the start time
-
-    // index plots - the x value is the index of the datum in the full dataset
-    // msg path (current) - x values are the items in the current message only
-    // msg path (accumulated) - x values are items from all the messages
-
     const datasets: Dataset[] = [];
     const numSeries = this.#seriesByMessagePath.size;
     for (const series of this.#seriesByMessagePath.values()) {

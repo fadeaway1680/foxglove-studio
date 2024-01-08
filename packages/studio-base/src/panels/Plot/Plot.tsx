@@ -48,6 +48,7 @@ import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import { HoverValue } from "./HoverValue";
+import { IndexDatasetsBuilder } from "./IndexDatasetsBuilder";
 import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
 import { downloadCSV } from "./csv";
@@ -233,8 +234,13 @@ export function Plot(props: Props): JSX.Element {
   }, [coordinator, config, globalVariables]);
 
   const datasetsBuilder = useMemo(() => {
-    if (xAxisVal === "timestamp") {
-      return new TimeseriesDatasetsBuilder();
+    switch (xAxisVal) {
+      case "timestamp":
+        return new TimeseriesDatasetsBuilder();
+      case "index":
+        return new IndexDatasetsBuilder();
+      default:
+        throw new Error(`unsupported mode: ${xAxisVal}`);
     }
 
     return undefined;
