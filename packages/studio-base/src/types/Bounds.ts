@@ -4,12 +4,17 @@
 
 import { Immutable } from "@foxglove/studio";
 
+type Bounds1D = {
+  min: number;
+  max: number;
+};
+
 /**
  * Describes the limits of a rectangular area in 2d space.
  */
 export type Bounds = {
-  x: { min: number; max: number };
-  y: { min: number; max: number };
+  x: Bounds1D;
+  y: Bounds1D;
 };
 
 /**
@@ -28,7 +33,14 @@ export function makeInvertedBounds(): Bounds {
  */
 export function unionBounds(a: Immutable<Bounds>, b: Immutable<Bounds>): Bounds {
   return {
-    x: { min: Math.min(a.x.min, b.x.min), max: Math.max(a.x.max, b.x.max) },
-    y: { min: Math.min(a.y.min, b.y.min), max: Math.max(a.y.max, b.y.max) },
+    x: unionBounds1D(a.x, b.x),
+    y: unionBounds1D(a.y, b.y),
   };
+}
+
+/**
+ * Find the union of two 1D bounds.
+ */
+export function unionBounds1D(a: Immutable<Bounds1D>, b: Immutable<Bounds1D>): Bounds1D {
+  return { min: Math.min(a.min, b.min), max: Math.max(a.max, b.max) };
 }

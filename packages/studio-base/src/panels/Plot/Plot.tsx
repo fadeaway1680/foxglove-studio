@@ -49,6 +49,7 @@ import { HoverValue } from "./HoverValue";
 import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
 import { CurrentCustomDatasetsBuilder } from "./builders/CurrentCustomDatasetsBuilder";
+import { CustomDatasetsBuilder } from "./builders/CustomDatasetsBuilder";
 import { IndexDatasetsBuilder } from "./builders/IndexDatasetsBuilder";
 import { TimeseriesDatasetsBuilder } from "./builders/TimeseriesDatasetsBuilder";
 import { downloadCSV } from "./csv";
@@ -240,6 +241,8 @@ export function Plot(props: Props): JSX.Element {
         return new TimeseriesDatasetsBuilder();
       case "index":
         return new IndexDatasetsBuilder();
+      case "custom":
+        return new CustomDatasetsBuilder();
       case "currentCustom":
         return new CurrentCustomDatasetsBuilder();
       default:
@@ -250,7 +253,10 @@ export function Plot(props: Props): JSX.Element {
   }, [xAxisVal]);
 
   useEffect(() => {
-    if (datasetsBuilder instanceof CurrentCustomDatasetsBuilder) {
+    if (
+      datasetsBuilder instanceof CurrentCustomDatasetsBuilder ||
+      datasetsBuilder instanceof CustomDatasetsBuilder
+    ) {
       if (!xAxisPath?.value) {
         datasetsBuilder.setXPath(undefined);
         return;
