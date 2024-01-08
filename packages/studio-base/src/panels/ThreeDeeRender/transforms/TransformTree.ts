@@ -2,6 +2,8 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
+
 import { CoordinateFrame, MAX_DURATION, FallbackFrameId, AnyFrameId } from "./CoordinateFrame";
 import { Transform } from "./Transform";
 import { Pose } from "./geometry";
@@ -26,12 +28,16 @@ export class TransformTree {
   #frames = new Map<string, CoordinateFrame>();
   #maxStorageTime: Duration;
   #maxCapacityPerFrame: number;
+  #transformPool: TransformPool;
+
   public defaultRootFrame: CoordinateFrame<FallbackFrameId>;
 
   public constructor(
+    transformPool: TransformPool,
     maxStorageTime = MAX_DURATION,
     maxCapacityPerFrame = DEFAULT_MAX_CAPACITY_PER_FRAME,
   ) {
+    this.#transformPool = transformPool;
     this.#maxStorageTime = maxStorageTime;
     this.#maxCapacityPerFrame = maxCapacityPerFrame;
     this.defaultRootFrame = new CoordinateFrame(
@@ -39,6 +45,7 @@ export class TransformTree {
       undefined,
       this.#maxStorageTime,
       this.#maxCapacityPerFrame,
+      this.#transformPool,
     );
     this.defaultRootFrame.addTransform(0n, Transform.Identity());
   }
@@ -66,6 +73,7 @@ export class TransformTree {
     if (!cycleDetected) {
       frame.addTransform(time, transform);
     }
+
     return cycleDetected
       ? AddTransformResult.CYCLE_DETECTED
       : updated
@@ -172,7 +180,13 @@ export class TransformTree {
   public getOrCreateFrame(id: string): CoordinateFrame {
     let frame = this.#frames.get(id);
     if (!frame) {
-      frame = new CoordinateFrame(id, undefined, this.#maxStorageTime, this.#maxCapacityPerFrame);
+      frame = new CoordinateFrame(
+        id,
+        undefined,
+        this.#maxStorageTime,
+        this.#maxCapacityPerFrame,
+        this.#transformPool,
+      );
       this.#frames.set(id, frame);
     }
     return frame;
@@ -293,7 +307,11 @@ export class TransformTree {
   }
 
   public static Clone(tree: TransformTree): TransformTree {
-    const newTree = new TransformTree(tree.#maxStorageTime, tree.#maxCapacityPerFrame);
+    const newTree = new TransformTree(
+      tree.#transformPool,
+      tree.#maxStorageTime,
+      tree.#maxCapacityPerFrame,
+    );
     newTree.#frames = tree.#frames;
     return newTree;
   }

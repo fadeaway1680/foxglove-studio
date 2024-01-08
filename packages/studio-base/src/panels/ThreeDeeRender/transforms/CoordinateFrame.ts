@@ -7,6 +7,7 @@
 import { mat4, quat, vec3, vec4 } from "gl-matrix";
 
 import { ArrayMap } from "@foxglove/den/collection";
+import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 
 import { Transform } from "./Transform";
 import { Pose, mat4Identity } from "./geometry";
@@ -15,6 +16,7 @@ import { Duration, interpolate, percentOf, Time } from "./time";
 type TimeAndTransform = [time: Time, transform: Transform];
 
 export const MAX_DURATION: Duration = 4_294_967_295n * BigInt(1e9);
+export const MAX_CAPACITY_EVICT_AMOUNT = 0.25;
 
 const DEG2RAD = Math.PI / 180;
 
@@ -43,12 +45,10 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
   public readonly id: ID;
   public maxStorageTime: Duration;
   public maxCapacity: number;
-  // The percentage of maxCapacity that can be exceeded before overfilled frames in history are cleared
-  // allows for better perf by amortizing trimming of frames every few thousand transforms rather than every new transform
-  public capacityOverfillPercentage: number;
   public offsetPosition: vec3 | undefined;
   public offsetEulerDegrees: vec3 | undefined;
 
+  #transformPool: TransformPool;
   #parent?: CoordinateFrame;
   #transforms: ArrayMap<Time, Transform>;
 
@@ -57,7 +57,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
     parent: CoordinateFrame | undefined, // fallback frame not allowed as parent
     maxStorageTime: Duration,
     maxCapacity: number,
-    capacityOverfillPercentage = 0.1,
+    transformPool: TransformPool,
   ) {
     if (parent) {
       this.#parent = parent;
@@ -65,8 +65,8 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
     this.id = id;
     this.maxStorageTime = maxStorageTime;
     this.maxCapacity = maxCapacity;
-    this.capacityOverfillPercentage = capacityOverfillPercentage;
     this.#transforms = new ArrayMap<Time, Transform>();
+    this.#transformPool = transformPool;
   }
 
   public static assertUserFrame(
@@ -118,6 +118,9 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
    */
   public setParent(parent: CoordinateFrame): void {
     if (this.#parent && this.#parent !== parent) {
+      for (const [__, tf] of this.#transforms) {
+        this.#transformPool.release(tf);
+      }
       this.#transforms.clear();
     }
     this.#parent = parent;
@@ -149,37 +152,48 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
    * If a transform with an identical timestamp already exists, it is replaced.
    */
   public addTransform(time: Time, transform: Transform): void {
-    this.#transforms.set(time, transform);
+    const oldTf = this.#transforms.set(time, transform);
+    if (oldTf?.[1]) {
+      this.#transformPool.release(oldTf[1]);
+    }
 
     // Remove transforms that are too old
-    // percent over the maxCapacity
-    const overfillPercent =
-      Math.max(0, this.#transforms.size - this.maxCapacity) / this.maxCapacity;
+    const transformsFull = this.#transforms.size >= this.maxCapacity;
 
     // Trim down to the maximum history size if we've exceeded the overfill
-    if (overfillPercent > this.capacityOverfillPercentage) {
-      const overfillIndex = this.#transforms.size - this.maxCapacity;
+    if (transformsFull) {
+      // remove a quarter of old transforms
+      const removeBeforeIndex = Math.floor(this.maxCapacity * MAX_CAPACITY_EVICT_AMOUNT);
       // guaranteed to be more than minKey
-      let removeBeforeTime = this.#transforms.at(overfillIndex)![0];
+      let removeBeforeTime = this.#transforms.at(removeBeforeIndex)![0];
       const endTime = this.#transforms.maxKey()!;
       // not guaranteed to be more than minKey
       const startTime = endTime - this.maxStorageTime;
-      // at the very least we remove the overfill, but if the maxStorageTime enforces a  larger trim we take that
-      // we can't afford to check maxStorageTime every time we add a transform, so we only check it when overfill is full
+      // at the very least we trim a quarter, but if the maxStorageTime enforces a larger trim we take that
+      // we can't afford to check maxStorageTime every time we add a transform, so we only check it when capacity is full
       removeBeforeTime = startTime > removeBeforeTime ? startTime : removeBeforeTime;
 
-      this.#transforms.removeBefore(removeBeforeTime);
+      const entriesRemoved = this.#transforms.removeBefore(removeBeforeTime);
+      for (const [__, tf] of entriesRemoved) {
+        this.#transformPool.release(tf);
+      }
     }
   }
 
   /** Remove all transforms with timestamps greater than the given timestamp. */
   public removeTransformsAfter(time: Time): void {
-    this.#transforms.removeAfter(time);
+    const removed = this.#transforms.removeAfter(time);
+    for (const [__, tf] of removed) {
+      this.#transformPool.release(tf);
+    }
   }
 
   /** Removes a transform with a specific timestamp */
   public removeTransformAt(time: Time): void {
-    this.#transforms.remove(time);
+    const tf = this.#transforms.remove(time);
+    if (tf?.[1]) {
+      this.#transformPool.release(tf[1]);
+    }
   }
 
   /**

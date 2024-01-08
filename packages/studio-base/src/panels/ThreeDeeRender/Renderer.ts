@@ -33,6 +33,7 @@ import {
 import { HUDItemManager } from "@foxglove/studio-base/panels/ThreeDeeRender/HUDItemManager";
 import { LayerErrors } from "@foxglove/studio-base/panels/ThreeDeeRender/LayerErrors";
 import { ICameraHandler } from "@foxglove/studio-base/panels/ThreeDeeRender/renderables/ICameraHandler";
+import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 import IAnalytics from "@foxglove/studio-base/services/IAnalytics";
 import { palette, fontMonospace } from "@foxglove/theme";
 import { LabelMaterial, LabelPool } from "@foxglove/three-text";
@@ -81,7 +82,7 @@ import {
   Vector3,
 } from "./ros";
 import { SelectEntry } from "./settings";
-import { AddTransformResult, CoordinateFrame, Transform, TransformTree } from "./transforms";
+import { AddTransformResult, CoordinateFrame, TransformTree } from "./transforms";
 import { InterfaceMode } from "./types";
 
 const log = Logger.getLogger(__filename);
@@ -196,7 +197,10 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
   #selectedRenderable: PickedRenderable | undefined;
   public colorScheme: "dark" | "light" = "light";
   public modelCache: ModelCache;
-  public transformTree = new TransformTree();
+
+  #transformPool = new TransformPool();
+  public transformTree = new TransformTree(this.#transformPool);
+
   public coordinateFrameList: SelectEntry[] = [];
   public currentTime = 0n;
   public fixedFrameId: string | undefined;
@@ -1042,7 +1046,9 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
     const t = translation;
     const q = rotation;
 
-    const transform = new Transform([t.x, t.y, t.z], [q.x, q.y, q.z, q.w]);
+    const transform = this.#transformPool.acquire();
+    transform.setPositionValues(t.x, t.y, t.z);
+    transform.setRotationValues(q.x, q.y, q.z, q.w);
     const status = this.transformTree.addTransform(childFrameId, parentFrameId, stamp, transform);
 
     if (status === AddTransformResult.UPDATED) {
