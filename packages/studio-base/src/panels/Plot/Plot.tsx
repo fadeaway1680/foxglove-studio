@@ -116,6 +116,7 @@ export function Plot(props: Props): JSX.Element {
   const { classes } = useStyles();
 
   const { setMessagePathDropConfig } = usePanelContext();
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     setMessagePathDropConfig({
@@ -176,6 +177,11 @@ export function Plot(props: Props): JSX.Element {
   const getMessagePipelineState = useMessagePipelineGetter();
   const onClick = useCallback(
     (event: React.MouseEvent<HTMLElement>): void => {
+      // If we started a drag we should not register a seek
+      if (draggingRef.current) {
+        return;
+      }
+
       // Only timestamp plots support click-to-seek
       if (xAxisVal !== "timestamp" || !coordinator) {
         return;
@@ -390,6 +396,11 @@ export function Plot(props: Props): JSX.Element {
   // because react re-uses the SyntheticEvent objects.
   const onMouseMove = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
+      // When dragging do not fetch tooltips
+      if (draggingRef.current) {
+        return;
+      }
+
       mousePresentRef.current = true;
       const boundingRect = event.currentTarget.getBoundingClientRect();
       buildTooltip?.({
@@ -463,6 +474,7 @@ export function Plot(props: Props): JSX.Element {
     hammerManager.add(new Hammer.Pan({ threshold }));
 
     hammerManager.on("panstart", async (event) => {
+      draggingRef.current = true;
       const boundingRect = event.target.getBoundingClientRect();
       coordinator.addInteractionEvent({
         type: "panstart",
@@ -489,6 +501,7 @@ export function Plot(props: Props): JSX.Element {
     });
 
     hammerManager.on("panend", async (event) => {
+      draggingRef.current = false;
       setShowReset(true);
       const boundingRect = event.target.getBoundingClientRect();
       coordinator.addInteractionEvent({

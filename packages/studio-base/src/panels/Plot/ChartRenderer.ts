@@ -244,16 +244,21 @@ export class ChartRenderer {
 
     if (action.domain) {
       const scaleOption = this.#chartInstance.options.scales?.y;
-      if (scaleOption) {
+      if (scaleOption && scaleOption.min !== action.domain.min) {
         scaleOption.min = action.domain.min;
+      }
+      if (scaleOption && scaleOption.max !== action.domain.max) {
         scaleOption.max = action.domain.max;
       }
     }
 
     if (action.range) {
       const scaleOption = this.#chartInstance.options.scales?.x;
-      if (scaleOption) {
+      if (scaleOption && scaleOption.min !== action.range.min) {
         scaleOption.min = action.range.min;
+      }
+
+      if (scaleOption && scaleOption.max !== action.range.max) {
         scaleOption.max = action.range.max;
       }
     }

@@ -139,6 +139,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
   public setTimeseriesBounds(bounds: Immutable<Partial<Bounds1D>>): void {
     this.#timeseriesRange = bounds;
+    this.#interactionBounds = undefined;
     this.#queueDispatchRender();
   }
 
