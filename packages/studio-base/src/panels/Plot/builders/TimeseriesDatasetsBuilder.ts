@@ -26,6 +26,7 @@ import type {
 } from "./TimeseriesDatasetsBuilderImpl";
 import { Dataset } from "../ChartRenderer";
 import { isReferenceLinePlotPathType } from "../internalTypes";
+import { MathFunction, mathFunctions } from "../mathFunctions";
 import { PlotConfig } from "../types";
 
 type SeriesItem = {
@@ -37,6 +38,7 @@ type SeriesItem = {
   showLine: boolean;
   lineSize: number;
   enabled: boolean;
+  derivative: boolean;
   blockCursor: BlockTopicCursor;
 };
 
@@ -80,6 +82,10 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
     const msgEvents = activeData.messages;
     if (msgEvents.length > 0) {
       for (const seriesConfig of this.#seriesConfigs) {
+        const mathFn = seriesConfig.parsed.modifier
+          ? mathFunctions[seriesConfig.parsed.modifier]
+          : undefined;
+
         if (didSeek) {
           this.#pendingDataDispatch.push({
             type: "reset-current",
@@ -92,7 +98,9 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
           seriesConfig.parsed,
           seriesConfig.timestampMethod,
           activeData.startTime,
+          mathFn,
         );
+
         this.#pendingDataDispatch.push({
           type: "append-current",
           series: seriesConfig.messagePath,
@@ -104,6 +112,10 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
     const blocks = state.progress.messageCache?.blocks;
     if (blocks) {
       for (const seriesConfig of this.#seriesConfigs) {
+        const mathFn = seriesConfig.parsed.modifier
+          ? mathFunctions[seriesConfig.parsed.modifier]
+          : undefined;
+
         if (seriesConfig.blockCursor.nextWillReset(blocks)) {
           this.#pendingDataDispatch.push({
             type: "reset-full",
@@ -118,6 +130,7 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
             seriesConfig.parsed,
             seriesConfig.timestampMethod,
             activeData.startTime,
+            mathFn,
           );
 
           this.#pendingDataDispatch.push({
@@ -181,6 +194,7 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
         timestampMethod: path.timestampMethod,
         showLine: path.showLine ?? true,
         enabled: path.enabled,
+        derivative: filledParsed.modifier === "derivative",
         blockCursor: existing?.blockCursor ?? new BlockTopicCursor(parsed.topicName),
       };
     });
@@ -218,6 +232,7 @@ function readMessagePathItems(
   path: Immutable<RosPath>,
   timestampMethod: TimestampMethod,
   startTime: Immutable<Time>,
+  mathFunction?: MathFunction,
 ): DataItem[] {
   const out = [];
   for (const event of events) {
@@ -241,7 +256,7 @@ function readMessagePathItems(
       const xValue = toSec(subtractTime(timestamp, startTime));
       out.push({
         x: xValue,
-        y: chartValue,
+        y: mathFunction ? mathFunction(chartValue) : chartValue,
         receiveTime: event.receiveTime,
         headerStamp,
       });

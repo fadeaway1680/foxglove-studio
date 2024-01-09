@@ -34,16 +34,3 @@ export const mathFunctions: { [fn: string]: MathFunction } = {
   deg2rad: (degrees: number) => degrees * (Math.PI / 180),
   rad2deg: (radians: number) => radians * (180 / Math.PI),
 };
-
-export function applyToDatum<T extends { y: number | string | bigint }>(
-  datum: T,
-  func: MathFunction,
-): T {
-  let { y } = datum;
-  const numericYValue: number = Number(y);
-  // Only apply the function if the Y value is a valid number.
-  if (!isNaN(numericYValue)) {
-    y = func(numericYValue);
-  }
-  return { ...datum, y, value: y };
-}

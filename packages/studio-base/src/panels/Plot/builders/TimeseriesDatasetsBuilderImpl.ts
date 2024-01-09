@@ -27,6 +27,8 @@ export type SeriesConfig = {
   showLine: boolean;
   lineSize: number;
   enabled: boolean;
+  // If true, the final dataset data is the time derivative of the input data
+  derivative: boolean;
 };
 
 type FullDatum = Datum & {
@@ -143,15 +145,42 @@ export class TimeseriesDatasetsBuilderImpl {
       const xBounds: Bounds1D = { min: 0, max: 0 };
       const yBounds: Bounds1D = { min: 0, max: 0 };
 
+      let prevX: number = 0;
+      let prevY: number = 0;
+
+      const derivative = series.config.derivative;
+
       // Trim the dataset down to the view area. include one point on either side so it appears
       // to extend out of the view area.
       for (let i = 0; i < allData.length; ++i) {
         const item = allData[i]!;
         item.index = i;
 
+        if (derivative && i === 0) {
+          prevX = item.x;
+          prevY = item.y;
+
+          // When we compute the derivative we will remove the first datum since we cannot compute its derivative
+          startIdx = 1;
+          continue;
+        }
+
         if (viewport.bounds.x?.min != undefined && item.x < viewport.bounds.x.min) {
           startIdx = i;
           continue;
+        }
+
+        if (derivative) {
+          // calculate derivative and replace existing datum
+          const rangeDiff = item.x - prevX;
+          const newY = rangeDiff === 0 ? 0 : (item.y - prevY) / rangeDiff;
+          allData[i] = {
+            ...item,
+            y: newY,
+          };
+
+          prevX = item.x;
+          prevY = item.y;
         }
 
         xBounds.min = Math.min(xBounds.min, item.x);
