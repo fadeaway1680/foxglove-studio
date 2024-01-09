@@ -143,6 +143,11 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     this.#queueDispatchRender();
   }
 
+  public setZoomMode(mode: "x" | "xy" | "y"): void {
+    this.#updateAction.zoomMode = mode;
+    this.#queueDispatchRender();
+  }
+
   public resetBounds(): void {
     this.#interactionBounds = undefined;
     this.#timeseriesRange = undefined;

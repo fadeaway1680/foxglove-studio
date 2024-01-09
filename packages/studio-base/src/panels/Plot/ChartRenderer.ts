@@ -7,6 +7,7 @@ import { AnnotationOptions } from "chartjs-plugin-annotation";
 import EventEmitter from "eventemitter3";
 
 import { Zoom as ZoomPlugin } from "@foxglove/chartjs-plugin-zoom";
+import { unwrap } from "@foxglove/den/monads";
 import { Immutable } from "@foxglove/studio";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { maybeCast } from "@foxglove/studio-base/util/maybeCast";
@@ -69,6 +70,7 @@ export type UpdateAction = {
   currentSeconds?: number;
   range?: Partial<Bounds1D>;
   domain?: Partial<Bounds1D>;
+  zoomMode?: "x" | "y" | "xy";
   referenceLines?: { color: string; value: number }[];
   interactionEvents?: InteractionEvent[];
 };
@@ -281,6 +283,10 @@ export class ChartRenderer {
       for (const event of action.interactionEvents) {
         this.#applyInteractionEvent(event);
       }
+    }
+
+    if (action.zoomMode) {
+      unwrap(this.#chartInstance.options.plugins?.zoom?.zoom).mode = action.zoomMode;
     }
 
     if (action.referenceLines) {

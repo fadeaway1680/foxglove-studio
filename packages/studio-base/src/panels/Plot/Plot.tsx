@@ -12,6 +12,7 @@ import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
 import { add as addTimes, fromSec } from "@foxglove/rostime";
 import { Immutable } from "@foxglove/studio";
+import KeyListener from "@foxglove/studio-base/components/KeyListener";
 import parseRosPath from "@foxglove/studio-base/components/MessagePathSyntax/parseRosPath";
 import { fillInGlobalVariablesInPath } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
 import {
@@ -612,6 +613,27 @@ export function Plot(props: Props): JSX.Element {
     return values;
   }, [activeTooltip, config.paths.length, config.showPlotValuesInLegend]);
 
+  const { keyDownHandlers, keyUphandlers } = useMemo(() => {
+    return {
+      keyDownHandlers: {
+        v: () => {
+          coordinator?.setZoomMode("y");
+        },
+        b: () => {
+          coordinator?.setZoomMode("xy");
+        },
+      },
+      keyUphandlers: {
+        v: () => {
+          coordinator?.setZoomMode("x");
+        },
+        b: () => {
+          coordinator?.setZoomMode("x");
+        },
+      },
+    };
+  }, [coordinator]);
+
   // The reset view button is shown when we have interacted locally or if the global bounds are set
   // and we are sync'd.
   const showResetViewButton = showReset || (globalBounds != undefined && shouldSync);
@@ -680,6 +702,7 @@ export function Plot(props: Props): JSX.Element {
         <PanelContextMenu getItems={getPanelContextMenuItems} />
       </Stack>
       <HoverValue coordinator={coordinator} enabled={xAxisVal === "timestamp"} />
+      <KeyListener global keyDownHandlers={keyDownHandlers} keyUpHandlers={keyUphandlers} />
     </Stack>
   );
 }
