@@ -2,7 +2,7 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { Button, Tooltip, Fade, buttonClasses } from "@mui/material";
+import { Button, Tooltip, Fade, buttonClasses, useTheme } from "@mui/material";
 import Hammer from "hammerjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { makeStyles } from "tss-react/mui";
@@ -115,6 +115,7 @@ export function Plot(props: Props): JSX.Element {
   } = config;
 
   const { classes } = useStyles();
+  const theme = useTheme();
 
   const { setMessagePathDropConfig } = usePanelContext();
   const draggingRef = useRef(false);
@@ -306,7 +307,7 @@ export function Plot(props: Props): JSX.Element {
     }
 
     const offscreenCanvas = canvas.transferControlToOffscreen();
-    const plotCoordinator = new PlotCoordinator(offscreenCanvas, datasetsBuilder);
+    const plotCoordinator = new PlotCoordinator(offscreenCanvas, datasetsBuilder, theme);
     setCoordinator(plotCoordinator);
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -328,7 +329,7 @@ export function Plot(props: Props): JSX.Element {
       plotCoordinator.destroy();
       canvasDiv.removeChild(canvas);
     };
-  }, [canvasDiv, datasetsBuilder, getMessagePipelineState, subscribeMessasagePipeline]);
+  }, [canvasDiv, datasetsBuilder, getMessagePipelineState, subscribeMessasagePipeline, theme]);
 
   const onWheel = useCallback(
     (event: React.WheelEvent<HTMLElement>) => {

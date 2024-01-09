@@ -125,7 +125,12 @@ export class ChartRenderer {
   #hoverValue?: number;
   #currentValue?: number;
 
-  public constructor(args: { canvas: OffscreenCanvas; devicePixelRatio: number }) {
+  public constructor(args: {
+    canvas: OffscreenCanvas;
+    devicePixelRatio: number;
+    gridColor: string;
+    tickColor: string;
+  }) {
     const fakeNode = {
       addEventListener: addEventListener(this.#fakeNodeEvents),
       removeEventListener: removeEventListener(this.#fakeNodeEvents),
@@ -167,9 +172,28 @@ export class ChartRenderer {
       scales: {
         x: {
           display: true,
+          grid: { color: args.gridColor },
+          ticks: {
+            font: {
+              family: fontMonospace,
+              size: 10,
+            },
+            color: args.tickColor,
+            maxRotation: 0,
+          },
         },
         y: {
           display: true,
+          grid: { color: args.gridColor },
+          ticks: {
+            font: {
+              family: fontMonospace,
+              size: 10,
+            },
+            color: args.tickColor,
+            padding: 0,
+            precision: 3,
+          },
         },
       },
       plugins: {

@@ -25,6 +25,8 @@ import { ChartRenderer } from "./ChartRenderer";
 type InitArgs = {
   canvas: OffscreenCanvas;
   devicePixelRatio: number;
+  gridColor: string;
+  tickColor: string;
 };
 
 export type Service<T> = {

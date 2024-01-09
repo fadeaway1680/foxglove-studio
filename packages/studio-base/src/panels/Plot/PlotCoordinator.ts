@@ -2,6 +2,7 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+import { Theme } from "@mui/material";
 import * as Comlink from "comlink";
 import EventEmitter from "eventemitter3";
 
@@ -70,6 +71,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
   #latestXScale?: Scale;
 
+  #theme: Theme;
+
   #queueDispatchRender = debouncePromise(async () => {
     await this.#dispatchRender();
   });
@@ -78,9 +81,10 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     await this.#dispatchDatasets();
   });
 
-  public constructor(canvas: OffscreenCanvas, builder: IDatasetsBuilder) {
+  public constructor(canvas: OffscreenCanvas, builder: IDatasetsBuilder, theme: Theme) {
     super();
 
+    this.#theme = theme;
     this.#datasetsBuilder = builder;
     this.#canvas = canvas;
     this.#renderingWorker = new Worker(
@@ -305,6 +309,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
         {
           canvas: this.#canvas,
           devicePixelRatio: window.devicePixelRatio,
+          gridColor: this.#theme.palette.divider,
+          tickColor: this.#theme.palette.text.secondary,
         },
         [this.#canvas],
       ),
