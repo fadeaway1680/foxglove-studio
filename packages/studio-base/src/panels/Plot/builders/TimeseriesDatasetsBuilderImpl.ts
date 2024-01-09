@@ -125,6 +125,15 @@ export class TimeseriesDatasetsBuilderImpl {
       // If downsampling aglos change to not need the .index then we can get rid of some copies
       const allData = series.full.slice();
       if (series.current.length > 0) {
+        // Add a NaN entry to create a discontinuity between the full data and the current data and
+        // avoid the "long interpolated line" during preloading if the current playback head is
+        // later in the data
+        allData.push({
+          x: NaN,
+          y: NaN,
+          index: 0,
+          receiveTime: { sec: 0, nsec: 0 },
+        });
         allData.push(...series.current);
       }
 
@@ -134,7 +143,8 @@ export class TimeseriesDatasetsBuilderImpl {
       const xBounds: Bounds1D = { min: 0, max: 0 };
       const yBounds: Bounds1D = { min: 0, max: 0 };
 
-      // trim the dataset down to the
+      // Trim the dataset down to the view area. include one point on either side so it appears
+      // to extend out of the view area.
       for (let i = 0; i < allData.length; ++i) {
         const item = allData[i]!;
         item.index = i;
