@@ -321,7 +321,7 @@ export class ChartRenderer {
       newAnnotations.push({
         type: "line",
         drawTime: "beforeDatasetsDraw",
-        display: () => this.#hoverValue != undefined,
+        display: () => this.#currentValue != undefined,
         xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
         xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
         borderColor: "rgb(255 , 99, 132)",

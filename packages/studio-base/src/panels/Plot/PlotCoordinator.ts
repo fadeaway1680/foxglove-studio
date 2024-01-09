@@ -7,8 +7,8 @@ import EventEmitter from "eventemitter3";
 
 import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
-import { compare, toSec, subtract as subtractTime } from "@foxglove/rostime";
-import { Immutable, Time } from "@foxglove/studio";
+import { toSec, subtract as subtractTime } from "@foxglove/rostime";
+import { Immutable } from "@foxglove/studio";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
 import { PlayerState } from "@foxglove/studio-base/players/types";
@@ -57,9 +57,11 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   #datasetRange?: Bounds1D;
   #interactionBounds?: Bounds;
 
-  #currentTime?: Time;
-
   #updateAction: UpdateAction = { type: "update" };
+
+  #isTimeseriesPlot: boolean = false;
+  #currentSeconds?: number;
+  #hoverSeconds?: number;
 
   #viewport: Viewport = {
     size: { width: 0, height: 0 },
@@ -95,12 +97,9 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       return;
     }
 
-    if (!this.#currentTime || compare(this.#currentTime, activeData.currentTime) !== 0) {
-      this.#currentTime = activeData.currentTime;
-
-      this.#updateAction.currentSeconds = toSec(
-        subtractTime(this.#currentTime, activeData.startTime),
-      );
+    if (this.#isTimeseriesPlot) {
+      const secondsSinceStart = toSec(subtractTime(activeData.currentTime, activeData.startTime));
+      this.#currentSeconds = secondsSinceStart;
     }
 
     const datasetsRange = this.#datasetsBuilder.handlePlayerState(state);
@@ -110,6 +109,11 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   public handleConfig(config: Immutable<PlotConfig>, globalVariables: GlobalVariables): void {
+    this.#isTimeseriesPlot = config.xAxisVal === "timestamp";
+    if (!this.#isTimeseriesPlot) {
+      this.#currentSeconds = undefined;
+    }
+
     this.#configBounds = {
       x: {
         max: config.maxXValue,
@@ -182,7 +186,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   public setHoverValue(seconds?: number): void {
-    this.#updateAction.hoverSeconds = seconds;
+    this.#hoverSeconds = seconds;
     this.#queueDispatchRender();
   }
 
@@ -240,6 +244,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       min: yMin,
       max: yMax,
     };
+    this.#updateAction.hoverSeconds = this.#hoverSeconds;
+    this.#updateAction.currentSeconds = this.#currentSeconds;
 
     const haveInteractionEvents = (this.#updateAction.interactionEvents?.length ?? 0) > 0;
 
