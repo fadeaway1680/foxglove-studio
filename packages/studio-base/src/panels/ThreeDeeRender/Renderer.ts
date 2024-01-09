@@ -414,6 +414,7 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
 
     this.labelPool.dispose();
     this.markerPool.dispose();
+    this.#transformPool.dispose();
     this.#picker.dispose();
     this.input.dispose();
     this.gl.dispose();
