@@ -221,43 +221,67 @@ export default function PlaybackControls(props: {
             <PlaybackTimeDisplay onSeek={seek} onPause={pause} />
           </Stack>
           <Stack direction="row" alignItems="center" gap={1}>
-            <HoverableIconButton
-              disabled={disableControls}
-              size="small"
-              title="Seek backward"
-              icon={<Previous20Regular />}
-              activeIcon={<Previous20Filled />}
-              onClick={() => {
-                seekBackwardAction();
-              }}
-            />
-            <HoverableIconButton
-              disabled={disableControls}
-              size="small"
-              title={isPlaying ? "Pause" : "Play"}
-              onClick={togglePlayPause}
-              icon={isPlaying ? <Pause20Regular /> : <Play20Regular />}
-              activeIcon={isPlaying ? <Pause20Filled /> : <Play20Filled />}
-            />
-            <HoverableIconButton
-              disabled={disableControls}
-              size="small"
-              title="Seek forward"
-              icon={<Next20Regular />}
-              activeIcon={<Next20Filled />}
-              onClick={() => {
-                seekForwardAction();
-              }}
-            />
+            <Tooltip
+              title={
+                <>
+                  Seek backward <kbd>←</kbd>
+                </>
+              }
+            >
+              <HoverableIconButton
+                disabled={disableControls}
+                size="small"
+                title="Seek backward"
+                icon={<Previous20Regular />}
+                activeIcon={<Previous20Filled />}
+                onClick={() => {
+                  seekBackwardAction();
+                }}
+              />
+            </Tooltip>
+            <Tooltip
+              title={
+                <>
+                  {isPlaying ? "Pause" : "Play"} <kbd>Space</kbd>
+                </>
+              }
+            >
+              <HoverableIconButton
+                disabled={disableControls}
+                size="small"
+                onClick={togglePlayPause}
+                icon={isPlaying ? <Pause20Regular /> : <Play20Regular />}
+                activeIcon={isPlaying ? <Pause20Filled /> : <Play20Filled />}
+              />
+            </Tooltip>
+            <Tooltip
+              title={
+                <>
+                  Seek foreward <kbd>→</kbd>
+                </>
+              }
+            >
+              <HoverableIconButton
+                disabled={disableControls}
+                size="small"
+                title="Seek forward"
+                icon={<Next20Regular />}
+                activeIcon={<Next20Filled />}
+                onClick={() => {
+                  seekForwardAction();
+                }}
+              />
+            </Tooltip>
           </Stack>
           <Stack direction="row" flex={1} alignItems="center" justifyContent="flex-end" gap={0.5}>
-            <HoverableIconButton
-              size="small"
-              title="Loop playback"
-              color={repeat ? "primary" : "inherit"}
-              onClick={toggleRepeat}
-              icon={repeat ? <ArrowRepeatAll20Regular /> : <ArrowRepeatAllOff20Regular />}
-            />
+            <Tooltip title="Loop playback">
+              <HoverableIconButton
+                size="small"
+                color={repeat ? "primary" : "inherit"}
+                onClick={toggleRepeat}
+                icon={repeat ? <ArrowRepeatAll20Regular /> : <ArrowRepeatAllOff20Regular />}
+              />
+            </Tooltip>
             <PlaybackSpeedControls />
           </Stack>
         </Stack>

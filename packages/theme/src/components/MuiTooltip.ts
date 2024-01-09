@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
 import { Fade, alpha } from "@mui/material";
+import tc from "tinycolor2";
 
 import { OverrideComponentReturn } from "../types";
 
@@ -21,6 +22,14 @@ export const MuiTooltip: OverrideComponentReturn<"MuiTooltip"> = {
       backdropFilter: "blur(3px)",
       fontWeight: "normal",
       fontSize: theme.typography.caption.fontSize,
+
+      kbd: {
+        background: tc(theme.palette.common.white).darken(45).toString(),
+        padding: theme.spacing(0, 0.5),
+        aspectRatio: 1,
+        borderRadius: theme.shape.borderRadius,
+        marginLeft: theme.spacing(1),
+      },
     }),
   },
 };
