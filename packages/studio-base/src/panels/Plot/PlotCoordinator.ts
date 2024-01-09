@@ -31,6 +31,12 @@ type EventTypes = {
   timeseriesBounds(bounds: Immutable<Bounds1D>): void;
 };
 
+// If the datasets builder is garbage collected we also need to cleanup the worker
+// This registry ensures the worker is cleaned up when the builder is garbage collected
+const registry = new FinalizationRegistry<Worker>((worker) => {
+  worker.terminate();
+});
+
 /**
  * PlotCoordinator interfaces commands and updates between the dataset builder and the chart
  * renderer.
@@ -79,6 +85,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       // foxglove-depcheck-used: babel-plugin-transform-import-meta
       new URL("./ChartRenderer.worker", import.meta.url),
     );
+
+    registry.register(this, this.#renderingWorker);
   }
 
   public handlePlayerState(state: Immutable<PlayerState>): void {

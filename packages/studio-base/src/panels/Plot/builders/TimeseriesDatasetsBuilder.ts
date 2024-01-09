@@ -40,6 +40,12 @@ type SeriesItem = {
   blockCursor: BlockTopicCursor;
 };
 
+// If the datasets builder is garbage collected we also need to cleanup the worker
+// This registry ensures the worker is cleaned up when the builder is garbage collected
+const registry = new FinalizationRegistry<Worker>((worker) => {
+  worker.terminate();
+});
+
 export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
   #datasetsBuilderWorker: Worker;
   #datasetsBuilderRemote: Comlink.Remote<Comlink.RemoteObject<TimeseriesDatasetsBuilderImpl>>;
@@ -58,6 +64,8 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
       new URL("./TimeseriesDatasetsBuilderImpl.worker", import.meta.url),
     );
     this.#datasetsBuilderRemote = Comlink.wrap(this.#datasetsBuilderWorker);
+
+    registry.register(this, this.#datasetsBuilderWorker);
   }
 
   public handlePlayerState(state: Immutable<PlayerState>): Bounds1D | undefined {

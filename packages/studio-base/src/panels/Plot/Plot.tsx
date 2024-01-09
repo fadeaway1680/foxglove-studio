@@ -242,6 +242,19 @@ export function Plot(props: Props): JSX.Element {
     coordinator?.handleConfig(config, globalVariables);
   }, [coordinator, config, globalVariables]);
 
+  // This effect must come after the one above it so the coordinator gets the latest config before
+  // the latest player state and can properly initialize if the player state already contains the
+  // data for display.
+  useEffect(() => {
+    const unsub = subscribeMessasagePipeline((state) => {
+      coordinator?.handlePlayerState(state.playerState);
+    });
+
+    // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
+    coordinator?.handlePlayerState(getMessagePipelineState().playerState);
+    return unsub;
+  }, [coordinator, getMessagePipelineState, subscribeMessasagePipeline]);
+
   const datasetsBuilder = useMemo(() => {
     switch (xAxisVal) {
       case "timestamp":
@@ -296,13 +309,6 @@ export function Plot(props: Props): JSX.Element {
     const plotCoordinator = new PlotCoordinator(offscreenCanvas, datasetsBuilder);
     setCoordinator(plotCoordinator);
 
-    const unsub = subscribeMessasagePipeline((state) => {
-      plotCoordinator.handlePlayerState(state.playerState);
-    });
-
-    // Subscribing only gets us _new_ updates, so we feed the latest state into the chart
-    plotCoordinator.handlePlayerState(getMessagePipelineState().playerState);
-
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.target !== canvasDiv) {
@@ -318,7 +324,6 @@ export function Plot(props: Props): JSX.Element {
     resizeObserver.observe(canvasDiv);
 
     return () => {
-      unsub();
       resizeObserver.disconnect();
       plotCoordinator.destroy();
       canvasDiv.removeChild(canvas);
@@ -326,7 +331,7 @@ export function Plot(props: Props): JSX.Element {
   }, [canvasDiv, datasetsBuilder, getMessagePipelineState, subscribeMessasagePipeline]);
 
   const onWheel = useCallback(
-    async (event: React.WheelEvent<HTMLElement>) => {
+    (event: React.WheelEvent<HTMLElement>) => {
       if (!coordinator) {
         return;
       }
@@ -474,7 +479,7 @@ export function Plot(props: Props): JSX.Element {
     const threshold = 10;
     hammerManager.add(new Hammer.Pan({ threshold }));
 
-    hammerManager.on("panstart", async (event) => {
+    hammerManager.on("panstart", (event) => {
       draggingRef.current = true;
       const boundingRect = event.target.getBoundingClientRect();
       coordinator.addInteractionEvent({
@@ -490,7 +495,7 @@ export function Plot(props: Props): JSX.Element {
       });
     });
 
-    hammerManager.on("panmove", async (event) => {
+    hammerManager.on("panmove", (event) => {
       const boundingRect = event.target.getBoundingClientRect();
       coordinator.addInteractionEvent({
         type: "panmove",
@@ -501,7 +506,7 @@ export function Plot(props: Props): JSX.Element {
       });
     });
 
-    hammerManager.on("panend", async (event) => {
+    hammerManager.on("panend", (event) => {
       draggingRef.current = false;
       setShowReset(true);
       const boundingRect = event.target.getBoundingClientRect();
