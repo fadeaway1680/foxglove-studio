@@ -12,14 +12,15 @@ import { Immutable, Time } from "@foxglove/studio";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
 import { PlayerState } from "@foxglove/studio-base/players/types";
+import { Bounds } from "@foxglove/studio-base/types/Bounds";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
 import {
   ChartRenderer,
   HoverElement,
   InteractionEvent,
-  RenderAction,
   Scale,
+  UpdateAction,
 } from "./ChartRenderer";
 import type { Service } from "./ChartRenderer.worker";
 import { CsvDataset, IDatasetsBuilder, Viewport } from "./builders/IDatasetsBuilder";
@@ -41,12 +42,18 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
   #datasetsBuilder: IDatasetsBuilder;
 
-  #timeseriesBounds?: Immutable<Partial<Bounds1D>>;
-  #datasetBounds: Bounds1D = { min: 0, max: 1 };
+  #configBounds: { x: Partial<Bounds1D>; y: Partial<Bounds1D> } = {
+    x: {},
+    y: {},
+  };
+
+  #timeseriesRange?: Immutable<Partial<Bounds1D>>;
+  #datasetRange?: Bounds1D;
+  #interactionBounds?: Bounds;
 
   #currentTime?: Time;
 
-  #pendingRenderActions: Immutable<RenderAction>[] = [];
+  #updateAction: UpdateAction = { type: "update" };
 
   #viewport: Viewport = {
     size: { width: 0, height: 0 },
@@ -83,54 +90,28 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     if (!this.#currentTime || compare(this.#currentTime, activeData.currentTime) !== 0) {
       this.#currentTime = activeData.currentTime;
 
-      this.#pendingRenderActions.push({
-        type: "current-time",
-        seconds: toSec(subtractTime(this.#currentTime, activeData.startTime)),
-      });
+      this.#updateAction.currentSeconds = toSec(
+        subtractTime(this.#currentTime, activeData.startTime),
+      );
     }
 
-    const datasetBounds = this.#datasetsBuilder.handlePlayerState(state);
+    const datasetsRange = this.#datasetsBuilder.handlePlayerState(state);
 
-    // fixme - logically this is easier to think about if you consider each one overriding the next
-    // highest precedent value is the config xmin/max values
-    // then the dataset bounds
-    // then the timeseries bounds
-    // then the current interaction bounds
-
-    if (
-      datasetBounds &&
-      (this.#timeseriesBounds?.max == undefined || this.#timeseriesBounds.min == undefined) &&
-      (datasetBounds.min !== this.#datasetBounds.min ||
-        datasetBounds.max !== this.#datasetBounds.max)
-    ) {
-      this.#pendingRenderActions.push({
-        type: "range",
-        bounds: {
-          min: this.#timeseriesBounds?.min ?? datasetBounds.min,
-          max: this.#timeseriesBounds?.max ?? datasetBounds.max,
-        },
-      });
-      this.#datasetBounds = datasetBounds;
-    }
-
+    this.#datasetRange = datasetsRange;
     this.#queueDispatchRender();
   }
 
   public handleConfig(config: Immutable<PlotConfig>, globalVariables: GlobalVariables): void {
-    // fixme
-    /*
-
-    config.showXAxisLabels;
-    config.showYAxisLabels;
-
-    config.xAxisVal;
-
-    config.maxXValue;
-    config.minXValue;
-
-    config.maxYValue;
-    config.minYValue;
-    */
+    this.#configBounds = {
+      x: {
+        max: config.maxXValue,
+        min: config.minXValue,
+      },
+      y: {
+        max: config.maxYValue == undefined ? undefined : +config.maxYValue,
+        min: config.minYValue == undefined ? undefined : +config.minYValue,
+      },
+    };
 
     const referenceLines = filterMap(config.paths, (path, idx) => {
       if (!path.enabled || !isReferenceLinePlotPathType(path)) {
@@ -148,42 +129,28 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       };
     });
 
-    this.#pendingRenderActions.push({
-      type: "references-lines",
-      referenceLines,
-    });
+    this.#updateAction.showXAxisLabels = config.showXAxisLabels;
+    this.#updateAction.showYAxisLabels = config.showYAxisLabels;
+    this.#updateAction.referenceLines = referenceLines;
 
     this.#datasetsBuilder.setConfig(config, globalVariables);
+    this.#queueDispatchRender();
   }
 
   public setTimeseriesBounds(bounds: Immutable<Partial<Bounds1D>>): void {
-    this.#timeseriesBounds = bounds;
-    this.#pendingRenderActions.push({
-      type: "range",
-      bounds: {
-        min: bounds.min ?? this.#datasetBounds.min,
-        max: bounds.max ?? this.#datasetBounds.max,
-      },
-    });
+    this.#timeseriesRange = bounds;
     this.#queueDispatchRender();
   }
 
   public resetBounds(): void {
-    this.#timeseriesBounds = undefined;
-    this.#pendingRenderActions.push({
-      type: "range",
-      bounds: this.#datasetBounds,
-    });
-    this.#viewport.bounds.x = undefined;
-    this.#viewport.bounds.y = undefined;
+    this.#interactionBounds = undefined;
+    this.#timeseriesRange = undefined;
     this.#queueDispatchRender();
   }
 
   public setSize(size: { width: number; height: number }): void {
-    this.#pendingRenderActions.push({
-      type: "size",
-      size,
-    });
+    this.#viewport.size = size;
+    this.#updateAction.size = size;
     this.#queueDispatchRender();
   }
 
@@ -193,18 +160,15 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   public addInteractionEvent(ev: InteractionEvent): void {
-    this.#pendingRenderActions.push({
-      type: "event",
-      event: ev,
-    });
+    if (!this.#updateAction.interactionEvents) {
+      this.#updateAction.interactionEvents = [];
+    }
+    this.#updateAction.interactionEvents.push(ev);
     this.#queueDispatchRender();
   }
 
   public setHoverValue(seconds?: number): void {
-    this.#pendingRenderActions.push({
-      type: "hover",
-      seconds,
-    });
+    this.#updateAction.hoverSeconds = seconds;
     this.#queueDispatchRender();
   }
 
@@ -240,35 +204,66 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   async #dispatchRender(): Promise<void> {
     const renderer = await this.#rendererInstance();
 
-    // fixme - filter pending actions to only the last of each kind (except interaction events)
-    // fixme - a single state object would do that
+    const xMin =
+      this.#interactionBounds?.x.min ??
+      this.#timeseriesRange?.min ??
+      this.#configBounds.x.min ??
+      this.#datasetRange?.min;
+    const xMax =
+      this.#interactionBounds?.x.max ??
+      this.#timeseriesRange?.max ??
+      this.#configBounds.x.max ??
+      this.#datasetRange?.max;
 
-    const actions = this.#pendingRenderActions;
-    if (actions.length > 0) {
-      let haveInteractionEvents = false;
-      for (const action of actions) {
-        if (action.type === "size") {
-          this.#viewport.size = action.size;
-        } else if (action.type === "range") {
-          this.#viewport.bounds.x = action.bounds;
-        } else if (action.type === "event") {
-          haveInteractionEvents = true;
-        }
-      }
+    const yMin = this.#interactionBounds?.y.min ?? this.#configBounds.y.min;
+    const yMax = this.#interactionBounds?.y.max ?? this.#configBounds.y.max;
 
-      this.#pendingRenderActions = [];
-      const bounds = await renderer.dispatchActions(actions);
+    this.#updateAction.range = {
+      min: xMin,
+      max: xMax,
+    };
+    this.#updateAction.domain = {
+      min: yMin,
+      max: yMax,
+    };
 
-      if (haveInteractionEvents && bounds) {
-        this.#viewport.bounds = bounds;
-        this.emit("timeseriesBounds", bounds.x);
-      }
+    const haveInteractionEvents = (this.#updateAction.interactionEvents?.length ?? 0) > 0;
+
+    const action = this.#updateAction;
+    this.#updateAction = {
+      type: "update",
+    };
+
+    const bounds = await renderer.update(action);
+
+    if (haveInteractionEvents) {
+      this.#interactionBounds = bounds;
     }
 
+    if (haveInteractionEvents && bounds) {
+      this.emit("timeseriesBounds", bounds.x);
+    }
     this.#queueDispatchDatasets();
   }
 
   async #dispatchDatasets(): Promise<void> {
+    const minX =
+      this.#interactionBounds?.x.min ??
+      this.#timeseriesRange?.min ??
+      this.#configBounds.x.min ??
+      this.#datasetRange?.min;
+
+    const maxX =
+      this.#interactionBounds?.x.max ??
+      this.#timeseriesRange?.max ??
+      this.#configBounds.x.max ??
+      this.#datasetRange?.max;
+    this.#viewport.bounds.x = {
+      min: minX,
+      max: maxX,
+    };
+    this.#viewport.bounds.y = this.#interactionBounds?.y ?? this.#configBounds.y;
+
     const datasets = await this.#datasetsBuilder.getViewportDatasets(this.#viewport);
     const renderer = await this.#rendererInstance();
     this.#latestXScale = await renderer.updateDatasets(datasets);

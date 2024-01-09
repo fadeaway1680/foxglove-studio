@@ -23,8 +23,8 @@ export type Viewport = {
   // The numeric bounds of the viewport. When x or y are undefined, that axis is not bounded
   // and assumed to display the entire range from the data.
   bounds: {
-    x?: Bounds1D;
-    y?: Bounds1D;
+    x?: Partial<Bounds1D>;
+    y?: Partial<Bounds1D>;
   };
   size: Size;
 };

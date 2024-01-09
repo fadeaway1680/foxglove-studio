@@ -139,7 +139,7 @@ export class TimeseriesDatasetsBuilderImpl {
         const item = allData[i]!;
         item.index = i;
 
-        if (viewport.bounds.x && item.x < viewport.bounds.x.min) {
+        if (viewport.bounds.x?.min != undefined && item.x < viewport.bounds.x.min) {
           startIdx = i;
           continue;
         }
@@ -150,7 +150,7 @@ export class TimeseriesDatasetsBuilderImpl {
         yBounds.min = Math.min(yBounds.min, item.y);
         yBounds.max = Math.max(yBounds.max, item.y);
 
-        if (viewport.bounds.x && item.x > viewport.bounds.x.max) {
+        if (viewport.bounds.x?.max != undefined && item.x > viewport.bounds.x.max) {
           endIdx = i;
           break;
         }
@@ -162,8 +162,14 @@ export class TimeseriesDatasetsBuilderImpl {
         width: viewport.size.width,
         height: viewport.size.height,
         bounds: {
-          x: viewport.bounds.x ?? xBounds,
-          y: viewport.bounds.y ?? yBounds,
+          x: {
+            ...xBounds,
+            ...viewport.bounds.x,
+          },
+          y: {
+            ...yBounds,
+            ...viewport.bounds.y,
+          },
         },
       };
 

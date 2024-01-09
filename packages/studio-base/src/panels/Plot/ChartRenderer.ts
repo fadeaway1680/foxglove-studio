@@ -60,43 +60,18 @@ export type HoverElement = {
   datasetIndex: number;
 };
 
-type UpdateSizeAction = {
-  type: "size";
-  size: { width: number; height: number };
+export type UpdateAction = {
+  type: "update";
+  size?: { width: number; height: number };
+  showXAxisLabels?: boolean;
+  showYAxisLabels?: boolean;
+  hoverSeconds?: number;
+  currentSeconds?: number;
+  range?: Partial<Bounds1D>;
+  domain?: Partial<Bounds1D>;
+  referenceLines?: { color: string; value: number }[];
+  interactionEvents?: InteractionEvent[];
 };
-
-type UpdateRangeAction = {
-  type: "range";
-  bounds: Bounds1D;
-};
-
-type InteractionEventAction = {
-  type: "event";
-  event: InteractionEvent;
-};
-
-type UpdateHoverAction = {
-  type: "hover";
-  seconds?: number;
-};
-
-type UpdateCurrentTimeAction = {
-  type: "current-time";
-  seconds?: number;
-};
-
-type ReferenceLinesAction = {
-  type: "references-lines";
-  referenceLines: { color: string; value: number }[];
-};
-
-export type RenderAction =
-  | UpdateSizeAction
-  | UpdateRangeAction
-  | InteractionEventAction
-  | ReferenceLinesAction
-  | UpdateHoverAction
-  | UpdateCurrentTimeAction;
 
 function addEventListener(emitter: EventEmitter) {
   return (eventName: string, fn?: () => void) => {
@@ -257,9 +232,92 @@ export class ChartRenderer {
     this.#chartInstance = chartInstance;
   }
 
-  public dispatchActions(actions: Immutable<RenderAction[]>): Bounds | undefined {
-    for (const action of actions) {
-      this.#applyAction(action);
+  public update(action: Immutable<UpdateAction>): Bounds | undefined {
+    if (action.size) {
+      this.#chartInstance.canvas.width = action.size.width;
+      this.#chartInstance.canvas.height = action.size.height;
+      this.#chartInstance.resize();
+    }
+
+    this.#hoverValue = action.hoverSeconds;
+    this.#currentValue = action.currentSeconds;
+
+    if (action.domain) {
+      const scaleOption = this.#chartInstance.options.scales?.y;
+      if (scaleOption) {
+        scaleOption.min = action.domain.min;
+        scaleOption.max = action.domain.max;
+      }
+    }
+
+    if (action.range) {
+      const scaleOption = this.#chartInstance.options.scales?.x;
+      if (scaleOption) {
+        scaleOption.min = action.range.min;
+        scaleOption.max = action.range.max;
+      }
+    }
+
+    if (action.showYAxisLabels != undefined) {
+      const ticksOptions = this.#chartInstance.options.scales?.y?.ticks;
+      if (ticksOptions) {
+        ticksOptions.display = action.showYAxisLabels;
+      }
+    }
+
+    if (action.showXAxisLabels != undefined) {
+      const ticksOptions = this.#chartInstance.options.scales?.x?.ticks;
+      if (ticksOptions) {
+        ticksOptions.display = action.showXAxisLabels;
+      }
+    }
+
+    if (action.interactionEvents) {
+      for (const event of action.interactionEvents) {
+        this.#applyInteractionEvent(event);
+      }
+    }
+
+    if (action.referenceLines) {
+      const annotation = this.#chartInstance.options.plugins?.annotation;
+      if (!annotation) {
+        return;
+      }
+
+      const newAnnotations: AnnotationOptions[] = action.referenceLines.map((config) => {
+        return {
+          type: "line",
+          display: true,
+          drawTime: "beforeDatasetsDraw",
+          scaleID: "y",
+          borderColor: config.color,
+          borderDash: [5, 5],
+          borderWidth: 1,
+          value: config.value,
+        };
+      });
+
+      newAnnotations.push({
+        type: "line",
+        drawTime: "beforeDatasetsDraw",
+        display: () => this.#hoverValue != undefined,
+        xMin: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+        xMax: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
+        borderColor: "rgb(0 , 99, 132)",
+        borderWidth: 1,
+      });
+
+      newAnnotations.push({
+        type: "line",
+        drawTime: "beforeDatasetsDraw",
+        display: () => this.#hoverValue != undefined,
+        xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+        xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
+        borderColor: "rgb(255 , 99, 132)",
+        borderWidth: 1,
+      });
+
+      annotation.annotations = newAnnotations;
     }
 
     // NOTE: "none" disables animations - this is important for chart performance because we update
@@ -346,76 +404,6 @@ export class ChartRenderer {
       left: xScale.left,
       right: xScale.right,
     };
-  }
-
-  #applyAction(action: Immutable<RenderAction>): void {
-    switch (action.type) {
-      case "size":
-        this.#chartInstance.canvas.width = action.size.width;
-        this.#chartInstance.canvas.height = action.size.height;
-        this.#chartInstance.resize();
-        break;
-      case "hover":
-        this.#hoverValue = action.seconds;
-        break;
-      case "current-time":
-        this.#currentValue = action.seconds;
-        break;
-      case "event":
-        this.#applyInteractionEvent(action.event);
-
-        break;
-      case "range": {
-        const instanceScalesX = this.#chartInstance.options.scales?.x;
-        if (instanceScalesX) {
-          instanceScalesX.min = action.bounds.min;
-          instanceScalesX.max = action.bounds.max;
-        }
-        break;
-      }
-      case "references-lines": {
-        const annotation = this.#chartInstance.options.plugins?.annotation;
-        if (!annotation) {
-          return;
-        }
-
-        const newAnnotations: AnnotationOptions[] = action.referenceLines.map((config) => {
-          return {
-            type: "line",
-            display: true,
-            drawTime: "beforeDatasetsDraw",
-            scaleID: "y",
-            borderColor: config.color,
-            borderDash: [5, 5],
-            borderWidth: 1,
-            value: config.value,
-          };
-        });
-
-        newAnnotations.push({
-          type: "line",
-          drawTime: "beforeDatasetsDraw",
-          display: () => this.#hoverValue != undefined,
-          xMin: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
-          xMax: () => this.#hoverValue ?? Number.MIN_SAFE_INTEGER,
-          borderColor: "rgb(0 , 99, 132)",
-          borderWidth: 1,
-        });
-
-        newAnnotations.push({
-          type: "line",
-          drawTime: "beforeDatasetsDraw",
-          display: () => this.#hoverValue != undefined,
-          xMin: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
-          xMax: () => this.#currentValue ?? Number.MIN_SAFE_INTEGER,
-          borderColor: "rgb(255 , 99, 132)",
-          borderWidth: 1,
-        });
-
-        annotation.annotations = newAnnotations;
-        break;
-      }
-    }
   }
 
   #applyInteractionEvent(event: Immutable<InteractionEvent>): void {

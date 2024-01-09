@@ -189,8 +189,14 @@ export class CustomDatasetsBuilderImpl {
         width: viewport.size.width,
         height: viewport.size.height,
         bounds: {
-          x: viewport.bounds.x ?? xBounds,
-          y: viewport.bounds.y ?? yBounds,
+          x: {
+            ...xBounds,
+            ...viewport.bounds.x,
+          },
+          y: {
+            ...yBounds,
+            ...viewport.bounds.y,
+          },
         },
       };
 
