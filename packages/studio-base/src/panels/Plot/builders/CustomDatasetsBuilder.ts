@@ -242,12 +242,6 @@ export class CustomDatasetsBuilder implements IDatasetsBuilder {
     const dispatch = this.#pendingDataDispatch;
     if (dispatch.length > 0) {
       this.#pendingDataDispatch = [];
-
-      // fixme - filter data dispatch to remove series that are reset
-      // and series that are no longer present
-      // we don't need to send
-      // go backwards from end to start
-
       await this.#datasetsBuilderRemote.updateData(dispatch);
     }
 
