@@ -35,11 +35,19 @@ function VariableSliderPanel(props: Props): JSX.Element {
   const { min = 0, max = 10, step = 1 } = sliderProps;
   const globalVariableValue = globalVariables[globalVariableName];
   const theme = useTheme();
+  const [sliderValue, setSliderValue] = React.useState<number | number[]>(
+    typeof globalVariableValue === "number" ? globalVariableValue : 0,
+  );
 
   useVariableSliderSettings(config, saveConfig);
 
-  const sliderOnChange = useCallback(
-    (_event: Event, value: number | number[]) => {
+  const sliderOnChange = useCallback((_event: Event, value: number | number[]) => {
+    setSliderValue(value);
+  }, []);
+
+  const sliderOnChangeCommitted = useCallback(
+    (_event: unknown, value: number | number[]) => {
+      setSliderValue(value);
       if (value !== globalVariableValue) {
         setGlobalVariables({ [globalVariableName]: value });
       }
@@ -69,11 +77,12 @@ function VariableSliderPanel(props: Props): JSX.Element {
           max={max}
           step={step}
           marks={marks}
-          value={typeof globalVariableValue === "number" ? globalVariableValue : 0}
+          value={sliderValue}
           onChange={sliderOnChange}
+          onChangeCommitted={sliderOnChangeCommitted}
         />
         <Typography variant="h5" style={{ marginTop: theme.spacing(-2.5) }}>
-          {typeof globalVariableValue === "number" ? globalVariableValue : 0}
+          {sliderValue}
         </Typography>
       </Stack>
     </Stack>
