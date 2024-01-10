@@ -595,7 +595,7 @@ export function Plot(props: Props): JSX.Element {
     }
   }, [coordinator, setGlobalBounds, shouldSync]);
 
-  const valuesBySeriesIndex = useMemo(() => {
+  const hoveredValuesBySeriesIndex = useMemo(() => {
     if (!config.showPlotValuesInLegend) {
       return;
     }
@@ -656,6 +656,7 @@ export function Plot(props: Props): JSX.Element {
         {/* Pass stable values here for properties when not showing values so that the legend memoization remains stable. */}
         {legendDisplay !== "none" && (
           <PlotLegend
+            coordinator={coordinator}
             legendDisplay={legendDisplay}
             onClickPath={onClickPath}
             paths={series}
@@ -663,7 +664,8 @@ export function Plot(props: Props): JSX.Element {
             saveConfig={saveConfig}
             showLegend={showLegend}
             sidebarDimension={sidebarDimension}
-            valuesBySeriesIndex={valuesBySeriesIndex}
+            showValues={config.showPlotValuesInLegend}
+            hoveredValuesBySeriesIndex={hoveredValuesBySeriesIndex}
           />
         )}
         {showResetViewButton && (
