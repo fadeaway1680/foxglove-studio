@@ -9,7 +9,7 @@ import { Transform } from "./Transform";
 import { Pose } from "./geometry";
 import { Duration, Time } from "./time";
 
-const DEFAULT_MAX_CAPACITY_PER_FRAME = 50_000;
+export const DEFAULT_MAX_CAPACITY_PER_FRAME = 50_000;
 
 export enum AddTransformResult {
   NOT_UPDATED,

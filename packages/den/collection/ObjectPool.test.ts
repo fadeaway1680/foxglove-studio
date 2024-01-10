@@ -20,10 +20,10 @@ describe("ObjectPool", () => {
   });
   it("does not release past the maximum capacity", () => {
     const list = [{ a: 1 }, { a: 1 }];
-    const objectPool = new ObjectPool(() => ({ a: 1 }), 1);
-    list.forEach((obj) => {
+    const objectPool = new ObjectPool(() => ({ a: 1 }), { maxCapacity: 1 });
+    for (const obj of list) {
       objectPool.release(obj);
-    });
+    }
     // first object should be released, second should be dropped
     expect(objectPool.acquire() === list[0]).toBe(true);
     expect(objectPool.acquire() === list[1]).toBe(false);

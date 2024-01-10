@@ -82,7 +82,13 @@ import {
   Vector3,
 } from "./ros";
 import { SelectEntry } from "./settings";
-import { AddTransformResult, CoordinateFrame, TransformTree, initTransform } from "./transforms";
+import {
+  AddTransformResult,
+  CoordinateFrame,
+  DEFAULT_MAX_CAPACITY_PER_FRAME,
+  TransformTree,
+  initTransform,
+} from "./transforms";
 import { InterfaceMode } from "./types";
 
 const log = Logger.getLogger(__filename);
@@ -198,7 +204,15 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
   public colorScheme: "dark" | "light" = "light";
   public modelCache: ModelCache;
 
-  #transformPool = new ObjectPool(initTransform, 30000);
+  /**
+   * Max capacity should be chosen to be at least a several multiples of
+   * the CoordinateFrame transform max capacity. So that it can store a
+   * several coordinate frames being emptied.
+   * It's mostly just important to not let this grow unbounded.
+   */
+  #transformPool = new ObjectPool(initTransform, {
+    maxCapacity: 5 * DEFAULT_MAX_CAPACITY_PER_FRAME,
+  });
   public transformTree = new TransformTree(this.#transformPool);
 
   public coordinateFrameList: SelectEntry[] = [];
@@ -414,7 +428,7 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
 
     this.labelPool.dispose();
     this.markerPool.dispose();
-    this.#transformPool.dispose();
+    this.#transformPool.clear();
     this.#picker.dispose();
     this.input.dispose();
     this.gl.dispose();

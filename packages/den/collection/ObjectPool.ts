@@ -2,18 +2,34 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
+type ObjectPoolOptions = {
+  /**
+   * Limits the number of elements in the pool at a given time.
+   * After the limit is reached, releasing an object will not add it to the pool.
+   */
+  maxCapacity?: number;
+};
 /**
  * An object pool for reusing objects.
+ * Can be helpful for reusing objects that are either expensive to create or
+ * frequently used and discarded to avoid garbage collection.
+ *
+ * Options can be passed to it to limit the number of elements it has at once.
+ *
  */
 export class ObjectPool<T> {
   #init: () => T;
-  #maxCapacity: number;
+  #maxCapacity?: number;
   #objects: T[] = [];
-  #isDisposed = false;
 
-  public constructor(init: () => T, maxCapacity: number = 8000) {
+  /**
+   *
+   * @param init - A function that returns a new object.
+   * @param options.maxCapacity - Limits the number of elements in the pool at a given time.
+   */
+  public constructor(init: () => T, options: ObjectPoolOptions = {}) {
     this.#init = init;
-    this.#maxCapacity = maxCapacity;
+    this.#maxCapacity = options.maxCapacity;
   }
 
   /** Returns an object from the pool or instantiates and returns a new one if
@@ -23,18 +39,21 @@ export class ObjectPool<T> {
     return this.#objects.pop() ?? this.#init();
   }
 
-  /** Release a object back to the pool to be reused. */
+  /** Release a object back to the pool to be reused.
+   * If the maxCapacity is defined and has been reached it will be dropped.
+   */
   public release(obj: T): void {
-    if (!this.#isDisposed && this.#objects.length < this.#maxCapacity) {
+    if (this.#maxCapacity == undefined || this.#objects.length < this.#maxCapacity) {
       this.#objects.push(obj);
     }
   }
 
-  /** Disables releasing items to the pool and clears the pool array.
-   * This should be called when the pool is no longer needed.
+  /**
+   * Clears all objects in the pool.
+   * Returns the objects that were cleared; this can be helpful if they have
+   * custom dispose logic.
    */
-  public dispose(): void {
-    this.#isDisposed = true;
-    this.#objects.length = 0;
+  public clear(): T[] {
+    return this.#objects.splice(0);
   }
 }
