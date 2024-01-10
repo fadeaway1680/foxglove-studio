@@ -20,7 +20,6 @@ import { Image as RosImage } from "../../ros";
 export class WorkerImageDecoder {
   #worker: Worker;
   #remote: Comlink.Remote<(typeof import("./WorkerImageDecoder.worker"))["service"]>;
-  /** Aborts the current decode promise. */
   #abort?: () => void;
 
   public constructor() {
@@ -39,6 +38,10 @@ export class WorkerImageDecoder {
     options: Partial<RawImageOptions>,
   ): Promise<ImageData> {
     return await new Promise((resolve, reject) => {
+      /** More decode requests can be made while the last one is being processed
+       * so we need to keep track of the previous abort function and abort if the
+       * next one finishes before the first. If it's already resolved, then the abort is a noop.
+       */
       const prevAbort = this.#abort;
       // abort previous request
       this.#abort = makeAbort(reject);
@@ -54,8 +57,8 @@ export class WorkerImageDecoder {
      * promise and worker.
      */
     this.#abort?.();
-    this.#worker.terminate();
     this.#abort = undefined;
+    this.#worker.terminate();
   }
 }
 
