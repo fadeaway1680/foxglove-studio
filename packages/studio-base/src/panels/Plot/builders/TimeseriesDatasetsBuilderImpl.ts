@@ -9,6 +9,7 @@ import {
   downsampleTimeseries,
 } from "@foxglove/studio-base/components/TimeBasedChart/downsample";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
+import { unionBounds1D } from "@foxglove/studio-base/types/Bounds";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
 import { CsvDataset, Viewport } from "./IDatasetsBuilder";
@@ -142,8 +143,8 @@ export class TimeseriesDatasetsBuilderImpl {
       let startIdx = 0;
       let endIdx = allData.length;
 
-      const xBounds: Bounds1D = { min: 0, max: 0 };
-      const yBounds: Bounds1D = { min: 0, max: 0 };
+      let xBounds: Bounds1D = { min: Number.MAX_VALUE, max: Number.MIN_VALUE };
+      let yBounds: Bounds1D = { min: Number.MAX_VALUE, max: Number.MIN_VALUE };
 
       let prevX: number = 0;
       let prevY: number = 0;
@@ -183,11 +184,13 @@ export class TimeseriesDatasetsBuilderImpl {
           prevY = item.y;
         }
 
-        xBounds.min = Math.min(xBounds.min, item.x);
-        xBounds.max = Math.max(xBounds.max, item.x);
+        if (!isNaN(item.x)) {
+          xBounds = unionBounds1D(xBounds, { min: item.x, max: item.x });
+        }
 
-        yBounds.min = Math.min(yBounds.min, item.y);
-        yBounds.max = Math.max(yBounds.max, item.y);
+        if (!isNaN(item.y)) {
+          yBounds = unionBounds1D(yBounds, { min: item.y, max: item.y });
+        }
 
         if (viewport.bounds.x?.max != undefined && item.x > viewport.bounds.x.max) {
           endIdx = i;
