@@ -33,7 +33,7 @@ export class TransformTree {
   public defaultRootFrame: CoordinateFrame<FallbackFrameId>;
 
   public constructor(
-    transformPool: TransformPool = new TransformPool(),
+    transformPool: TransformPool,
     maxStorageTime = MAX_DURATION,
     maxCapacityPerFrame = DEFAULT_MAX_CAPACITY_PER_FRAME,
   ) {

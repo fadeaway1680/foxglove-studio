@@ -370,9 +370,7 @@ export function ThreeDeeRender(props: {
         }
 
         // Set the done callback into a state variable to trigger a re-render
-        // not using anonymous function to call done here because the closure would
-        // capture the entire context, which isn't necessary
-        setRenderDone(callFn(done));
+        setRenderDone(() => done);
 
         // Keep UI elements and the renderer aware of the current color scheme
         setColorScheme(renderState.colorScheme);
@@ -812,8 +810,4 @@ export function ThreeDeeRender(props: {
       </div>
     </ThemeProvider>
   );
-}
-
-function callFn(done: () => void): React.SetStateAction<(() => void) | undefined> {
-  return () => done;
 }

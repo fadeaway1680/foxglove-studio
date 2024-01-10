@@ -6,6 +6,10 @@ import { mat4, vec3, quat, ReadonlyMat4, ReadonlyVec3, ReadonlyQuat } from "gl-m
 
 import { Pose, getRotationNoScaling, mat4Identity, quatIdentity, vec3Identity } from "./geometry";
 
+/**
+ * temp variables declared here to avoid unnecessary allocations and
+ * subsequent garbage collection in high frequency operations
+ */
 const tempVec3: vec3 = [0, 0, 0];
 const tempQuat: quat = [0, 0, 0, 0];
 
@@ -59,7 +63,10 @@ export class Transform {
     return this;
   }
 
-  public setPositionValues(x: number, y: number, z: number): this {
+  /**
+   * Used to update the position without needing to allocate another array.
+   */
+  public updatePosition(x: number, y: number, z: number): this {
     tempVec3[0] = x;
     tempVec3[1] = y;
     tempVec3[2] = z;
@@ -71,8 +78,10 @@ export class Transform {
     mat4.fromRotationTranslation(this.#matrix, this.#rotation, this.#position);
     return this;
   }
-
-  public setRotationValues(x: number, y: number, z: number, w: number): this {
+  /**
+   * Used to update the rotation without needing to allocate another array.
+   */
+  public updateRotation(x: number, y: number, z: number, w: number): this {
     tempQuat[0] = x;
     tempQuat[1] = y;
     tempQuat[2] = z;

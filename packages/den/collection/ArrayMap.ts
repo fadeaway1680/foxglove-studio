@@ -15,8 +15,9 @@ export class ArrayMap<K, V> {
     return this.#list.length;
   }
 
-  public clear(): void {
-    this.#list.length = 0;
+  /** Clears array and returns removed elements */
+  public clear(): [K, V][] {
+    return this.#list.splice(0);
   }
 
   public [Symbol.iterator](): IterableIterator<[K, V]> {
@@ -61,7 +62,9 @@ export class ArrayMap<K, V> {
     return this.#list.pop();
   }
 
-  /** Removes the element with the given key, if it exists */
+  /** Removes the element with the given key, if it exists.
+   * Returns element removed.
+   */
   public remove(key: K): [K, V] | undefined {
     const index = this.binarySearch(key);
     if (index >= 0) {
@@ -70,7 +73,9 @@ export class ArrayMap<K, V> {
     return undefined;
   }
 
-  /** Removes all elements with keys greater than the given key. */
+  /** Removes all elements with keys greater than the given key.
+   * Returns elements removed.
+   */
   public removeAfter(key: K): [K, V][] {
     const index = this.binarySearch(key);
     const greaterThanIndex = index >= 0 ? index + 1 : ~index;
@@ -78,7 +83,9 @@ export class ArrayMap<K, V> {
     return removed;
   }
 
-  /** Removes all elements with keys less than the given key. */
+  /** Removes all elements with keys less than the given key.
+   * Returns elements removed.
+   */
   public removeBefore(key: K): [K, V][] {
     const index = this.binarySearch(key);
     const lessThanIndex = index >= 0 ? index : ~index;

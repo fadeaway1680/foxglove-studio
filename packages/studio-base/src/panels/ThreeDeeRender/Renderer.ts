@@ -1048,8 +1048,8 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
     const q = rotation;
 
     const transform = this.#transformPool.acquire();
-    transform.setPositionValues(t.x, t.y, t.z);
-    transform.setRotationValues(q.x, q.y, q.z, q.w);
+    transform.updatePosition(t.x, t.y, t.z);
+    transform.updateRotation(q.x, q.y, q.z, q.w);
     const status = this.transformTree.addTransform(childFrameId, parentFrameId, stamp, transform);
 
     if (status === AddTransformResult.UPDATED) {

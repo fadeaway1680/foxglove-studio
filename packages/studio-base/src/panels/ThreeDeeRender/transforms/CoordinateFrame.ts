@@ -16,7 +16,8 @@ import { Duration, interpolate, percentOf, Time } from "./time";
 type TimeAndTransform = [time: Time, transform: Transform];
 
 export const MAX_DURATION: Duration = 4_294_967_295n * BigInt(1e9);
-export const MAX_CAPACITY_EVICT_AMOUNT = 0.25;
+// Number of transforms evicted is this * max capacity
+export const MAX_CAPACITY_EVICT_PORTION = 0.25;
 
 const DEG2RAD = Math.PI / 180;
 
@@ -118,10 +119,10 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
    */
   public setParent(parent: CoordinateFrame): void {
     if (this.#parent && this.#parent !== parent) {
-      for (const [__, tf] of this.#transforms) {
+      const removed = this.#transforms.clear();
+      for (const [, tf] of removed) {
         this.#transformPool.release(tf);
       }
-      this.#transforms.clear();
     }
     this.#parent = parent;
   }
@@ -163,7 +164,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
     // Trim down to the maximum history size if we've exceeded the capacity
     if (transformsFull) {
       // remove a quarter of old transforms
-      const removeBeforeIndex = Math.floor(this.maxCapacity * MAX_CAPACITY_EVICT_AMOUNT);
+      const removeBeforeIndex = Math.floor(this.maxCapacity * MAX_CAPACITY_EVICT_PORTION);
       // guaranteed to be more than minKey
       let removeBeforeTime = this.#transforms.at(removeBeforeIndex)![0];
       const endTime = this.#transforms.maxKey()!;
@@ -174,7 +175,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
       removeBeforeTime = startTime > removeBeforeTime ? startTime : removeBeforeTime;
 
       const entriesRemoved = this.#transforms.removeBefore(removeBeforeTime);
-      for (const [__, tf] of entriesRemoved) {
+      for (const [, tf] of entriesRemoved) {
         this.#transformPool.release(tf);
       }
     }
@@ -183,7 +184,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
   /** Remove all transforms with timestamps greater than the given timestamp. */
   public removeTransformsAfter(time: Time): void {
     const removed = this.#transforms.removeAfter(time);
-    for (const [__, tf] of removed) {
+    for (const [, tf] of removed) {
       this.#transformPool.release(tf);
     }
   }
