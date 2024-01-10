@@ -198,7 +198,7 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
   public colorScheme: "dark" | "light" = "light";
   public modelCache: ModelCache;
 
-  #transformPool = new ObjectPool(initTransform);
+  #transformPool = new ObjectPool(initTransform, 30000);
   public transformTree = new TransformTree(this.#transformPool);
 
   public coordinateFrameList: SelectEntry[] = [];
