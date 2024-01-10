@@ -28,4 +28,14 @@ describe("ObjectPool", () => {
     expect(objectPool.acquire() === list[0]).toBe(true);
     expect(objectPool.acquire() === list[1]).toBe(false);
   });
+  it("returns all elements on clear", () => {
+    const list = [{ a: 1 }, { a: 1 }];
+    const objectPool = new ObjectPool(() => ({ a: 1 }));
+    for (const obj of list) {
+      objectPool.release(obj);
+    }
+    expect(objectPool.clear()).toEqual(list);
+    //second clear should be empty
+    expect(objectPool.clear()).toEqual([]);
+  });
 });
