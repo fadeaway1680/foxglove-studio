@@ -67,6 +67,7 @@ export class WorkerImageDecoder {
   }
 }
 
+/** Creates a function that calls the reject function with an abort error */
 function makeAbort(reject: (reason?: unknown) => void): () => void {
   return () => {
     reject(new Error("Decode aborted."));
