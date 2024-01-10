@@ -39,19 +39,10 @@ export class WorkerImageDecoder {
     options: Partial<RawImageOptions>,
   ): Promise<ImageData> {
     return await new Promise((resolve, reject) => {
-      const oldAbort = this.#abort;
+      const prevAbort = this.#abort;
       // abort previous request
-      this.#abort = () => {
-        reject("Decode aborted.");
-      };
-      void this.#remote
-        .decode(image, options)
-        .then(resolve)
-        .catch(reject)
-        .finally(() => {
-          // will no-op if already resolved
-          oldAbort?.();
-        });
+      this.#abort = makeAbort(reject);
+      void this.#remote.decode(image, options).then(resolve).catch(reject).finally(prevAbort);
     });
   }
 
@@ -66,4 +57,10 @@ export class WorkerImageDecoder {
     this.#worker.terminate();
     this.#abort = undefined;
   }
+}
+
+function makeAbort(reject: (reason?: unknown) => void): () => void {
+  return () => {
+    reject(new Error("Decode aborted."));
+  };
 }
