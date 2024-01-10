@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { DeepPartial, assert } from "ts-essentials";
 import { v4 as uuidv4 } from "uuid";
 
+import { ObjectPool } from "@foxglove/den/collection";
 import Logger from "@foxglove/log";
 import { Time, fromNanoSec, isLessThan, toNanoSec } from "@foxglove/rostime";
 import type { FrameTransform, FrameTransforms, SceneUpdate } from "@foxglove/schemas";
@@ -33,7 +34,6 @@ import {
 import { HUDItemManager } from "@foxglove/studio-base/panels/ThreeDeeRender/HUDItemManager";
 import { LayerErrors } from "@foxglove/studio-base/panels/ThreeDeeRender/LayerErrors";
 import { ICameraHandler } from "@foxglove/studio-base/panels/ThreeDeeRender/renderables/ICameraHandler";
-import { ObjectPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 import IAnalytics from "@foxglove/studio-base/services/IAnalytics";
 import { palette, fontMonospace } from "@foxglove/theme";
 import { LabelMaterial, LabelPool } from "@foxglove/three-text";
