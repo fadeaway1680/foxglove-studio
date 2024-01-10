@@ -567,10 +567,7 @@ export function Plot(props: Props): JSX.Element {
       return;
     }
 
-    coordinator?.setTimeseriesBounds({
-      min: globalBounds?.min,
-      max: globalBounds?.max,
-    });
+    coordinator?.setGlobalBounds(globalBounds);
   }, [coordinator, globalBounds, shouldSync, subscriberId]);
 
   useEffect(() => {
@@ -641,7 +638,7 @@ export function Plot(props: Props): JSX.Element {
 
   // The reset view button is shown when we have interacted locally or if the global bounds are set
   // and we are sync'd.
-  const showResetViewButton = showReset || (globalBounds != undefined && shouldSync);
+  const showResetViewButton = shouldSync ? globalBounds != undefined : showReset;
 
   return (
     <Stack

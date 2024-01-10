@@ -8,6 +8,7 @@ import EventEmitter from "eventemitter3";
 
 import { debouncePromise } from "@foxglove/den/async";
 import { filterMap } from "@foxglove/den/collection";
+import { toSec, subtract as subtractTime } from "@foxglove/rostime";
 import { Immutable } from "@foxglove/studio";
 import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { GlobalVariables } from "@foxglove/studio-base/hooks/useGlobalVariables";
@@ -56,11 +57,18 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     y: {},
   };
 
-  #timeseriesRange?: Immutable<Partial<Bounds1D>>;
+  #globalBounds?: Immutable<Partial<Bounds1D>>;
   #datasetRange?: Bounds1D;
+  #followRange?: number;
   #interactionBounds?: Bounds;
 
+  /** Flag indicating that new Y bounds should be sent to the renderer because the bounds have been reset */
+  #shouldResetY = false;
+
   #updateAction: UpdateAction = { type: "update" };
+
+  #isTimeseriesPlot: boolean = false;
+  #currentSeconds?: number;
 
   #viewport: Viewport = {
     size: { width: 0, height: 0 },
@@ -99,6 +107,11 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       return;
     }
 
+    if (this.#isTimeseriesPlot) {
+      const secondsSinceStart = toSec(subtractTime(activeData.currentTime, activeData.startTime));
+      this.#currentSeconds = secondsSinceStart;
+    }
+
     const datasetsRange = this.#datasetsBuilder.handlePlayerState(state);
 
     this.#datasetRange = datasetsRange;
@@ -106,6 +119,12 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   public handleConfig(config: Immutable<PlotConfig>, globalVariables: GlobalVariables): void {
+    this.#isTimeseriesPlot = config.xAxisVal === "timestamp";
+    if (!this.#isTimeseriesPlot) {
+      this.#currentSeconds = undefined;
+    }
+    this.#followRange = config.followingViewWidth;
+
     this.#configBounds = {
       x: {
         max: config.maxXValue,
@@ -137,13 +156,20 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     this.#updateAction.showYAxisLabels = config.showYAxisLabels;
     this.#updateAction.referenceLines = referenceLines;
 
+    // Config changes to yBounds always takes precedence over user interaction changes like pan/zoom
+    this.#updateAction.yBounds = this.#configBounds.y;
+
     this.#datasetsBuilder.setConfig(config, globalVariables);
     this.#queueDispatchRender();
   }
 
-  public setTimeseriesBounds(bounds: Immutable<Partial<Bounds1D>>): void {
-    this.#timeseriesRange = bounds;
+  public setGlobalBounds(bounds: Immutable<Bounds1D> | undefined): void {
+    this.#globalBounds = bounds;
     this.#interactionBounds = undefined;
+    if (bounds == undefined) {
+      // This happens when "reset view" is clicked in a different panel or otherwise cleared the global bounds
+      this.#shouldResetY = true;
+    }
     this.#queueDispatchRender();
   }
 
@@ -154,7 +180,8 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
 
   public resetBounds(): void {
     this.#interactionBounds = undefined;
-    this.#timeseriesRange = undefined;
+    this.#globalBounds = undefined;
+    this.#shouldResetY = true;
     this.#queueDispatchRender();
   }
 
@@ -209,28 +236,39 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   async #dispatchRender(): Promise<void> {
     const renderer = await this.#rendererInstance();
 
-    const xMin =
-      this.#interactionBounds?.x.min ??
-      this.#timeseriesRange?.min ??
-      this.#configBounds.x.min ??
-      this.#datasetRange?.min;
+    // Interaction, synced global bounds, config, and other bounds sources are combined in precedence order.
+    // currentSeconds is only included in the sequence if follow mode is enabled.
+
+    const currentSecondsIfFollowMode =
+      this.#isTimeseriesPlot && this.#followRange != undefined && this.#currentSeconds != undefined
+        ? this.#currentSeconds
+        : undefined;
     const xMax =
       this.#interactionBounds?.x.max ??
-      this.#timeseriesRange?.max ??
+      this.#globalBounds?.max ??
+      currentSecondsIfFollowMode ??
       this.#configBounds.x.max ??
       this.#datasetRange?.max;
 
-    const yMin = this.#interactionBounds?.y.min ?? this.#configBounds.y.min;
-    const yMax = this.#interactionBounds?.y.max ?? this.#configBounds.y.max;
+    const xMinIfFollowMode =
+      this.#isTimeseriesPlot && this.#followRange != undefined && xMax != undefined
+        ? xMax - this.#followRange
+        : undefined;
+    const xMin =
+      this.#interactionBounds?.x.min ??
+      this.#globalBounds?.min ??
+      xMinIfFollowMode ??
+      this.#configBounds.x.min ??
+      this.#datasetRange?.min;
 
-    this.#updateAction.range = {
-      min: xMin,
-      max: xMax,
-    };
-    this.#updateAction.domain = {
-      min: yMin,
-      max: yMax,
-    };
+    this.#updateAction.xBounds = { min: xMin, max: xMax };
+
+    if (this.#shouldResetY) {
+      const yMin = this.#interactionBounds?.y.min ?? this.#configBounds.y.min;
+      const yMax = this.#interactionBounds?.y.max ?? this.#configBounds.y.max;
+      this.#updateAction.yBounds = { min: yMin, max: yMax };
+      this.#shouldResetY = false;
+    }
 
     const haveInteractionEvents = (this.#updateAction.interactionEvents?.length ?? 0) > 0;
 
@@ -254,13 +292,13 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   async #dispatchDatasets(): Promise<void> {
     const minX =
       this.#interactionBounds?.x.min ??
-      this.#timeseriesRange?.min ??
+      this.#globalBounds?.min ??
       this.#configBounds.x.min ??
       this.#datasetRange?.min;
 
     const maxX =
       this.#interactionBounds?.x.max ??
-      this.#timeseriesRange?.max ??
+      this.#globalBounds?.max ??
       this.#configBounds.x.max ??
       this.#datasetRange?.max;
     this.#viewport.bounds.x = {

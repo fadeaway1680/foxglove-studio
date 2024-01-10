@@ -54,8 +54,6 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
 
   #pendingDataDispatch: Immutable<UpdateDataAction>[] = [];
 
-  #followRange?: number;
-
   #lastSeekTime = 0;
 
   #seriesConfigs: Immutable<SeriesItem[]> = [];
@@ -142,15 +140,6 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
       }
     }
 
-    // If we are using follow mode, then we will update the current time so the plot x-axis range
-    // will update the display window
-    if (this.#followRange != undefined) {
-      const max = toSec(subtractTime(activeData.currentTime, activeData.startTime));
-      const min = max - this.#followRange;
-
-      return { min, max };
-    }
-
     const max = toSec(subtractTime(activeData.endTime, activeData.startTime));
     const min = 0;
 
@@ -158,8 +147,6 @@ export class TimeseriesDatasetsBuilder implements IDatasetsBuilder {
   }
 
   public setConfig(config: Immutable<PlotConfig>, globalVariables: GlobalVariables): void {
-    this.#followRange = config.followingViewWidth;
-
     this.#seriesConfigs = filterMap(config.paths, (path, idx) => {
       if (isReferenceLinePlotPathType(path)) {
         return;

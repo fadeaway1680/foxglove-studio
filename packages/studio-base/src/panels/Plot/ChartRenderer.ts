@@ -66,8 +66,8 @@ export type UpdateAction = {
   size?: { width: number; height: number };
   showXAxisLabels?: boolean;
   showYAxisLabels?: boolean;
-  range?: Partial<Bounds1D>;
-  domain?: Partial<Bounds1D>;
+  xBounds?: Partial<Bounds1D>;
+  yBounds?: Partial<Bounds1D>;
   zoomMode?: "x" | "y" | "xy";
   referenceLines?: { color: string; value: number }[];
   interactionEvents?: InteractionEvent[];
@@ -240,24 +240,24 @@ export class ChartRenderer {
       this.#chartInstance.resize();
     }
 
-    if (action.domain) {
+    if (action.yBounds) {
       const scaleOption = this.#chartInstance.options.scales?.y;
-      if (scaleOption && scaleOption.min !== action.domain.min) {
-        scaleOption.min = action.domain.min;
+      if (scaleOption && scaleOption.min !== action.yBounds.min) {
+        scaleOption.min = action.yBounds.min;
       }
-      if (scaleOption && scaleOption.max !== action.domain.max) {
-        scaleOption.max = action.domain.max;
+      if (scaleOption && scaleOption.max !== action.yBounds.max) {
+        scaleOption.max = action.yBounds.max;
       }
     }
 
-    if (action.range) {
+    if (action.xBounds) {
       const scaleOption = this.#chartInstance.options.scales?.x;
-      if (scaleOption && scaleOption.min !== action.range.min) {
-        scaleOption.min = action.range.min;
+      if (scaleOption && scaleOption.min !== action.xBounds.min) {
+        scaleOption.min = action.xBounds.min;
       }
 
-      if (scaleOption && scaleOption.max !== action.range.max) {
-        scaleOption.max = action.range.max;
+      if (scaleOption && scaleOption.max !== action.xBounds.max) {
+        scaleOption.max = action.xBounds.max;
       }
     }
 
