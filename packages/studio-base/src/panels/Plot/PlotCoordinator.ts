@@ -233,9 +233,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
     return await this.#datasetsBuilder.getCsvData();
   }
 
-  async #dispatchRender(): Promise<void> {
-    const renderer = await this.#rendererInstance();
-
+  #getXBounds(): Partial<Bounds1D> {
     // Interaction, synced global bounds, config, and other bounds sources are combined in precedence order.
     // currentSeconds is only included in the sequence if follow mode is enabled.
 
@@ -261,7 +259,13 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
       this.#configBounds.x.min ??
       this.#datasetRange?.min;
 
-    this.#updateAction.xBounds = { min: xMin, max: xMax };
+    return { min: xMin, max: xMax };
+  }
+
+  async #dispatchRender(): Promise<void> {
+    const renderer = await this.#rendererInstance();
+
+    this.#updateAction.xBounds = this.#getXBounds();
 
     if (this.#shouldResetY) {
       const yMin = this.#interactionBounds?.y.min ?? this.#configBounds.y.min;
@@ -290,21 +294,7 @@ export class PlotCoordinator extends EventEmitter<EventTypes> {
   }
 
   async #dispatchDatasets(): Promise<void> {
-    const minX =
-      this.#interactionBounds?.x.min ??
-      this.#globalBounds?.min ??
-      this.#configBounds.x.min ??
-      this.#datasetRange?.min;
-
-    const maxX =
-      this.#interactionBounds?.x.max ??
-      this.#globalBounds?.max ??
-      this.#configBounds.x.max ??
-      this.#datasetRange?.max;
-    this.#viewport.bounds.x = {
-      min: minX,
-      max: maxX,
-    };
+    this.#viewport.bounds.x = this.#getXBounds();
     this.#viewport.bounds.y = this.#interactionBounds?.y ?? this.#configBounds.y;
 
     const datasets = await this.#datasetsBuilder.getViewportDatasets(this.#viewport);

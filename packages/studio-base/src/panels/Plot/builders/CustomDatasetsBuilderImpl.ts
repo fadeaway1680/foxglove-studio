@@ -190,12 +190,12 @@ export class CustomDatasetsBuilderImpl {
         height: viewport.size.height,
         bounds: {
           x: {
-            ...xBounds,
-            ...viewport.bounds.x,
+            min: viewport.bounds.x?.min ?? xBounds.min,
+            max: viewport.bounds.x?.max ?? xBounds.max,
           },
           y: {
-            ...yBounds,
-            ...viewport.bounds.y,
+            min: viewport.bounds.y?.min ?? yBounds.min,
+            max: viewport.bounds.y?.max ?? yBounds.max,
           },
         },
       };
