@@ -38,12 +38,17 @@ export class WorkerImageDecoder {
     options: Partial<RawImageOptions>,
   ): Promise<ImageData> {
     return await new Promise((resolve, reject) => {
+      /** WARNING:
+       * Be careful with closures in this function as they can easily create memory leaks
+       * by keeping a promise from being GC'ed until the next promise is resolved.
+       * Always test that these promises are not keeping images in memory over time.
+       */
+
       /** More decode requests can be made while the last one is being processed
        * so we need to keep track of the previous abort function and abort if the
        * next one finishes before the first. If it's already resolved, then the abort is a noop.
        */
       const prevAbort = this.#abort;
-      // abort previous request
       this.#abort = makeAbort(reject);
       void this.#remote.decode(image, options).then(resolve).catch(reject).finally(prevAbort);
     });
