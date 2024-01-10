@@ -2,7 +2,7 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
+import { ObjectPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 
 import { CoordinateFrame, MAX_DURATION, FallbackFrameId, AnyFrameId } from "./CoordinateFrame";
 import { Transform } from "./Transform";
@@ -28,12 +28,12 @@ export class TransformTree {
   #frames = new Map<string, CoordinateFrame>();
   #maxStorageTime: Duration;
   #maxCapacityPerFrame: number;
-  #transformPool: TransformPool;
+  #transformPool: ObjectPool<Transform>;
 
   public defaultRootFrame: CoordinateFrame<FallbackFrameId>;
 
   public constructor(
-    transformPool: TransformPool,
+    transformPool: ObjectPool<Transform>,
     maxStorageTime = MAX_DURATION,
     maxCapacityPerFrame = DEFAULT_MAX_CAPACITY_PER_FRAME,
   ) {

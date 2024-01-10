@@ -33,7 +33,7 @@ import {
 import { HUDItemManager } from "@foxglove/studio-base/panels/ThreeDeeRender/HUDItemManager";
 import { LayerErrors } from "@foxglove/studio-base/panels/ThreeDeeRender/LayerErrors";
 import { ICameraHandler } from "@foxglove/studio-base/panels/ThreeDeeRender/renderables/ICameraHandler";
-import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
+import { ObjectPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 import IAnalytics from "@foxglove/studio-base/services/IAnalytics";
 import { palette, fontMonospace } from "@foxglove/theme";
 import { LabelMaterial, LabelPool } from "@foxglove/three-text";
@@ -82,7 +82,7 @@ import {
   Vector3,
 } from "./ros";
 import { SelectEntry } from "./settings";
-import { AddTransformResult, CoordinateFrame, TransformTree } from "./transforms";
+import { AddTransformResult, CoordinateFrame, TransformTree, initTransform } from "./transforms";
 import { InterfaceMode } from "./types";
 
 const log = Logger.getLogger(__filename);
@@ -198,7 +198,7 @@ export class Renderer extends EventEmitter<RendererEvents> implements IRenderer 
   public colorScheme: "dark" | "light" = "light";
   public modelCache: ModelCache;
 
-  #transformPool = new TransformPool();
+  #transformPool = new ObjectPool(initTransform);
   public transformTree = new TransformTree(this.#transformPool);
 
   public coordinateFrameList: SelectEntry[] = [];

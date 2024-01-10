@@ -7,7 +7,7 @@
 import { mat4, quat, vec3, vec4 } from "gl-matrix";
 
 import { ArrayMap } from "@foxglove/den/collection";
-import { TransformPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
+import { ObjectPool } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms/TransformPool";
 
 import { Transform } from "./Transform";
 import { Pose, mat4Identity } from "./geometry";
@@ -49,7 +49,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
   public offsetPosition: vec3 | undefined;
   public offsetEulerDegrees: vec3 | undefined;
 
-  #transformPool: TransformPool;
+  #transformPool: ObjectPool<Transform>;
   #parent?: CoordinateFrame;
   #transforms: ArrayMap<Time, Transform>;
 
@@ -58,7 +58,7 @@ export class CoordinateFrame<ID extends AnyFrameId = UserFrameId> {
     parent: CoordinateFrame | undefined, // fallback frame not allowed as parent
     maxStorageTime: Duration,
     maxCapacity: number,
-    transformPool: TransformPool,
+    transformPool: ObjectPool<Transform>,
   ) {
     if (parent) {
       this.#parent = parent;

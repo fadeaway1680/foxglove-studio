@@ -170,3 +170,7 @@ export class Transform {
     return out;
   }
 }
+
+export function initTransform(): Transform {
+  return new Transform();
+}

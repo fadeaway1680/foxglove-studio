@@ -2,31 +2,31 @@
 // License, v2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
-import { Transform } from "@foxglove/studio-base/panels/ThreeDeeRender/transforms";
-
 /**
- * An object pool for Transforms
+ * An object pool for reusing objects.
  */
-export class TransformPool {
+export class ObjectPool<T> {
+  #init: () => T;
   #maxCapacity: number;
-  #transforms: Transform[] = [];
+  #objects: T[] = [];
   #isDisposed = false;
 
-  public constructor(maxCapacity: number = 8000) {
+  public constructor(init: () => T, maxCapacity: number = 8000) {
+    this.#init = init;
     this.#maxCapacity = maxCapacity;
   }
 
-  /** Returns a transform from the pool or instantiates and returns a new one if
+  /** Returns an object from the pool or instantiates and returns a new one if
    * there are none.
    */
-  public acquire(): Transform {
-    return this.#transforms.pop() ?? new Transform();
+  public acquire(): T {
+    return this.#objects.pop() ?? this.#init();
   }
 
-  /** Release a transform back to the pool to be reused. */
-  public release(transform: Transform): void {
-    if (!this.#isDisposed && this.#transforms.length < this.#maxCapacity) {
-      this.#transforms.push(transform);
+  /** Release a object back to the pool to be reused. */
+  public release(obj: T): void {
+    if (!this.#isDisposed && this.#objects.length < this.#maxCapacity) {
+      this.#objects.push(obj);
     }
   }
 
@@ -35,6 +35,6 @@ export class TransformPool {
    */
   public dispose(): void {
     this.#isDisposed = true;
-    this.#transforms.length = 0;
+    this.#objects.length = 0;
   }
 }
