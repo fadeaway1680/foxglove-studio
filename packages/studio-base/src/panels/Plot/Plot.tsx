@@ -47,6 +47,7 @@ import { SaveConfig } from "@foxglove/studio-base/types/panels";
 import { PANEL_TITLE_CONFIG_KEY } from "@foxglove/studio-base/util/layout";
 import { getLineColor } from "@foxglove/studio-base/util/plotColors";
 
+import { OffscreenCanvasRenderer } from "./OffscreenCanvasRenderer";
 import { PlotCoordinator } from "./PlotCoordinator";
 import { PlotLegend } from "./PlotLegend";
 import { CurrentCustomDatasetsBuilder } from "./builders/CurrentCustomDatasetsBuilder";
@@ -158,6 +159,7 @@ export function Plot(props: Props): JSX.Element {
   const [focusedPath, setFocusedPath] = useState<undefined | string[]>(undefined);
   const [subscriberId] = useState(() => uuidv4());
   const [canvasDiv, setCanvasDiv] = useState<HTMLDivElement | ReactNull>(ReactNull);
+  const [renderer, setRenderer] = useState<OffscreenCanvasRenderer | undefined>(undefined);
   const [coordinator, setCoordinator] = useState<PlotCoordinator | undefined>(undefined);
   const [showReset, setShowReset] = useState(false);
 
@@ -294,12 +296,17 @@ export function Plot(props: Props): JSX.Element {
   }, [datasetsBuilder, globalVariables, xAxisPath]);
 
   useEffect(() => {
-    if (!canvasDiv || !datasetsBuilder) {
+    if (!canvasDiv) {
       return;
     }
+
+    const clientRect = canvasDiv.getBoundingClientRect();
+
     const canvas = document.createElement("canvas");
     canvas.style.width = "100%";
     canvas.style.height = "100%";
+    canvas.width = clientRect.width;
+    canvas.height = clientRect.height;
     canvasDiv.appendChild(canvas);
 
     if (typeof canvas.transferControlToOffscreen !== "function") {
@@ -307,7 +314,19 @@ export function Plot(props: Props): JSX.Element {
     }
 
     const offscreenCanvas = canvas.transferControlToOffscreen();
-    const plotCoordinator = new PlotCoordinator(offscreenCanvas, datasetsBuilder, theme);
+    setRenderer(new OffscreenCanvasRenderer(offscreenCanvas, theme));
+
+    return () => {
+      canvasDiv.removeChild(canvas);
+    };
+  }, [canvasDiv, theme]);
+
+  useEffect(() => {
+    if (!renderer || !datasetsBuilder || !canvasDiv) {
+      return;
+    }
+
+    const plotCoordinator = new PlotCoordinator(renderer, datasetsBuilder);
     setCoordinator(plotCoordinator);
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -327,9 +346,8 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       resizeObserver.disconnect();
       plotCoordinator.destroy();
-      canvasDiv.removeChild(canvas);
     };
-  }, [canvasDiv, datasetsBuilder, getMessagePipelineState, subscribeMessasagePipeline, theme]);
+  }, [canvasDiv, datasetsBuilder, renderer]);
 
   const onWheel = useCallback(
     (event: React.WheelEvent<HTMLElement>) => {
@@ -360,7 +378,7 @@ export function Plot(props: Props): JSX.Element {
 
   useEffect(() => {
     const moveHandler = debouncePromise(async (args: ElementAtPixelArgs) => {
-      const elements = await coordinator?.getElementsAtPixel({
+      const elements = await renderer?.getElementsAtPixel({
         x: args.canvasX,
         y: args.canvasY,
       });
@@ -397,7 +415,7 @@ export function Plot(props: Props): JSX.Element {
     return () => {
       setBuildTooltip(undefined);
     };
-  }, [coordinator]);
+  }, [renderer]);
 
   // Extract the bounding client rect from currentTarget before calling the debounced function
   // because react re-uses the SyntheticEvent objects.

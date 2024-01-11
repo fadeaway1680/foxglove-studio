@@ -4,7 +4,7 @@
 
 import { Immutable } from "@foxglove/studio";
 
-type Bounds1D = {
+export type Bounds1D = {
   min: number;
   max: number;
 };

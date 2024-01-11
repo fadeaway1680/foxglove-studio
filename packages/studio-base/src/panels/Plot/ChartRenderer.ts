@@ -9,7 +9,7 @@ import EventEmitter from "eventemitter3";
 import { Zoom as ZoomPlugin } from "@foxglove/chartjs-plugin-zoom";
 import { unwrap } from "@foxglove/den/monads";
 import { Immutable } from "@foxglove/studio";
-import { Bounds1D } from "@foxglove/studio-base/components/TimeBasedChart/types";
+import { Bounds, Bounds1D } from "@foxglove/studio-base/types/Bounds";
 import { maybeCast } from "@foxglove/studio-base/util/maybeCast";
 import { fontMonospace } from "@foxglove/theme";
 
@@ -51,15 +51,12 @@ export type Dataset = ChartDataset<"scatter", Datum[]>;
 
 type ChartType = Chart<"scatter", Datum[]>;
 
-type Bounds = {
-  x: Bounds1D;
-  y: Bounds1D;
-};
-
 export type HoverElement = {
   data: Datum;
   datasetIndex: number;
 };
+
+export type Size = { width: number; height: number };
 
 export type UpdateAction = {
   type: "update";
