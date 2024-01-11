@@ -75,8 +75,10 @@ export type PlotParams = {
 };
 
 /**
+ * A "reference line" plot path is a numeric value. It creates a horizontal line on the plot at the
+ * specified value.
  * @returns true if the series config is a reference line
  */
 export function isReferenceLinePlotPathType(path: Immutable<PlotPath>): boolean {
-  return !isNaN(+path.value);
+  return !isNaN(Number.parseFloat(path.value));
 }
