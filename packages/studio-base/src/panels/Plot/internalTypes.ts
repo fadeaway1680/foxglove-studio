@@ -11,10 +11,11 @@
 //   found at http://www.apache.org/licenses/LICENSE-2.0
 //   You may not use this file except in compliance with the License.
 
+import { ScatterDataPoint } from "chart.js";
+
 import { Time } from "@foxglove/rostime";
 import { Immutable } from "@foxglove/studio";
 import { MessagePathDataItem } from "@foxglove/studio-base/components/MessagePathSyntax/useCachedGetMessagePathDataItems";
-import type { ChartDatum } from "@foxglove/studio-base/components/TimeBasedChart/types";
 import { MessageEvent } from "@foxglove/studio-base/players/types";
 import { TimestampMethod } from "@foxglove/studio-base/util/time";
 
@@ -48,9 +49,12 @@ export type PlotXAxisVal =
   // for x-axis and each series
   | "currentCustom";
 
+export type OriginalValue = string | bigint | number | boolean | Time;
+
 // In addition to the base datum, we also add receiveTime and optionally header stamp to our datums
 // These are used in the csv export.
-export type Datum = ChartDatum & {
+export type Datum = ScatterDataPoint & {
+  value: OriginalValue;
   receiveTime: Time;
   headerStamp?: Time;
 };

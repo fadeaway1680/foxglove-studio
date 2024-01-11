@@ -28,7 +28,7 @@ import {
 } from "./CustomDatasetsBuilderImpl";
 import { CsvDataset, IDatasetsBuilder, Viewport } from "./IDatasetsBuilder";
 import { Dataset } from "../ChartRenderer";
-import { isReferenceLinePlotPathType } from "../internalTypes";
+import { OriginalValue, isReferenceLinePlotPathType } from "../internalTypes";
 import { PlotConfig } from "../types";
 
 type SeriesItem = {
@@ -277,6 +277,9 @@ function readMessagePathItems(
 
     const items = simpleGetMessagePathDataItems(event, path);
     for (const item of items) {
+      if (!isChartValue(item)) {
+        continue;
+      }
       const chartValue = getChartValue(item);
       if (chartValue == undefined) {
         continue;
@@ -284,12 +287,31 @@ function readMessagePathItems(
 
       out.push({
         value: chartValue,
+        originalValue: item,
         receiveTime: event.receiveTime,
       });
     }
   }
 
   return out;
+}
+
+function isChartValue(value: unknown): value is OriginalValue {
+  switch (typeof value) {
+    case "bigint":
+    case "boolean":
+    case "number":
+    case "string":
+      return true;
+    case "object":
+      if (isTime(value)) {
+        return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+  return false;
 }
 
 function getChartValue(value: unknown): number | undefined {
